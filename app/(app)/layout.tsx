@@ -1,7 +1,20 @@
+"use client";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
+import { useAccount } from "@/lib/auth";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const account = useAccount();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (account === null) router.replace("/");
+  }, [account, router]);
+
+  if (!account) return null; // hydrating, or redirecting to login
+
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />

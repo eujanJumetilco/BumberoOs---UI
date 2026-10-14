@@ -1,7 +1,8 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { setAccount } from "@/lib/auth";
 
 const links = [
   { href: "/dashboard", label: "Dashboard" },
@@ -13,6 +14,7 @@ const links = [
 
 export default function Sidebar() {
   const path = usePathname();
+  const router = useRouter();
   return (
     <aside className="flex w-56 flex-col border-r bg-white p-4">
       <Link href="/dashboard" className="mb-4 block">
@@ -28,7 +30,7 @@ export default function Sidebar() {
       </Link>
       
 
-<button className="mb-6 rounded bg-red-700 py-2 text-sm font-semibold text-white">
+<button onClick={() => router.push("/dashboard?report=1")} className="mb-6 rounded bg-red-700 py-2 text-sm font-semibold text-white">
         Quick Dispatch
       </button>
       <nav className="flex flex-1 flex-col gap-1">
@@ -48,7 +50,12 @@ export default function Sidebar() {
       </nav>
       <div className="flex flex-col gap-1 text-sm text-gray-600">
         <Link href="/help" className="px-3 py-2">Help & Support</Link>
-        <button className="px-3 py-2 text-left">Log Out</button>
+        <button
+          onClick={() => { setAccount(null); router.replace("/"); }}
+          className="px-3 py-2 text-left"
+        >
+          Log Out
+        </button>
       </div>
     </aside>
   );

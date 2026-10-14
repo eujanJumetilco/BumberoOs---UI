@@ -1,599 +1,246 @@
 "use client";
 import { useState } from "react";
+import ErrorBanner from "@/components/ErrorBanner";
+import Modal, { Field, inputCls } from "@/components/Modal";
 import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
+import {
+  api, errMsg, ITEM_CATEGORIES, label, type Item, type ItemCategory, type ItemCondition,
+} from "@/lib/api";
+import { useLoad } from "@/lib/useLoad";
 
-type Item = {
-  name: string;
-  tag: string;
-  location: string;
-  condition: "Good" | "Maintenance" | "Retired";
-  nextInspection: string;
+const condTones = { GOOD: "green", DAMAGED: "amber", RETIRED: "gray" } as const;
+const availTones = { AVAILABLE: "green", PARTIALLY_DISPATCHED: "amber", DISPATCHED: "red", UNAVAILABLE: "gray" } as const;
+type Filter = "All" | ItemCondition;
+
+type Form = {
+  name: string; description: string; serialNumber: string;
+  category: ItemCategory; condition: ItemCondition; quantity: string;
 };
-
-const initialItems: Item[] = [
-  { name: "SCBA Breathing Apparatus Pack #04", tag: "SCBA-0004", location: "Engine 4", condition: "Good", nextInspection: "14 days" },
-  { name: "Hydraulic Rescue Cutter (Jaws of Life)", tag: "HYD-0012", location: "Engine 3", condition: "Maintenance", nextInspection: "Immediate Service" },
-  { name: "Thermal Imaging Camera Pack #35", tag: "TIC-0035", location: "Truck 2", condition: "Good", nextInspection: "42 days" },
-  { name: "2.5-inch Attack Fire Hose (50ft)", tag: "HOSE-0210", location: "Storage Bay", condition: "Retired", nextInspection: "Archived" },
-  { name: "Multi-Gas Detector Sensor Unit", tag: "GAS-0007", location: "In Quarters", condition: "Good", nextInspection: "5 days" },
-];
-
-const tones = { Good: "green", Maintenance: "amber", Retired: "gray" } as const;
-type Filter = "All" | Item["condition"];
+const emptyForm: Form = { name: "", description: "", serialNumber: "", category: "OTHER", condition: "GOOD", quantity: "1" };
 
 export default function InventoryPage() {
-  const [showAddEquipment, setShowAddEquipment] = useState(false);
-  const [items, setItems] = useState<Item[]>(initialItems);
+  const { data: items, error: loadError, loading, reload } = useLoad(() => api.listItems(), [] as Item[]);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("All");
+  const [category, setCategory] = useState<ItemCategory | "All">("All");
   const [query, setQuery] = useState("");
-  const [editingTag, setEditingTag] = useState<string | null>(null);
-  const [showLogCheck, setShowLogCheck] = useState(false);
-  const [selectedEquipment, setSelectedEquipment] = useState<Item | null>(null);
-  const [showEquipmentDetails, setShowEquipmentDetails] = useState(false);
-  const [checkResult, setCheckResult] = useState<"Passed" | "Failed">("Passed");
-  const [inspector, setInspector] = useState("");
-  const [checkNotes, setCheckNotes] = useState("");
-
-  const [newEquipment, setNewEquipment] = useState<Item>({
-  name: "",
-  tag: "",
-  location: "",
-  condition: "Good",
-  nextInspection: "",
-});
+  const [form, setForm] = useState<Form | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [details, setDetails] = useState<Item | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const visible = items.filter(
     (i) =>
       (filter === "All" || i.condition === filter) &&
-      (i.name + i.tag).toLowerCase().includes(query.toLowerCase())
+      (category === "All" || i.category === category) &&
+      (i.name + (i.serialNumber ?? "")).toLowerCase().includes(query.toLowerCase())
   );
+  const count = (f: Filter) => (f === "All" ? items.length : items.filter((i) => i.condition === f).length);
+  const ready = items.filter((i) => i.condition === "GOOD" && i.quantityAvailable > 0).length;
 
-  const count = (f: Filter) =>
-    f === "All" ? items.length : items.filter((i) => i.condition === f).length;
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
+    try { await fn(); await reload(); return true; }
+    catch (e) { setError(errMsg(e)); return false; }
+    finally { setBusy(false); }
+  };
+
+  const openEdit = (i: Item) => {
+    setEditingId(i.id);
+    setForm({
+      name: i.name, description: i.description ?? "", serialNumber: i.serialNumber ?? "",
+      category: i.category, condition: i.condition, quantity: String(i.quantity),
+    });
+  };
+
+  const save = async () => {
+    if (!form) return;
+    const quantity = Number(form.quantity);
+    if (!form.name.trim()) { setError("Equipment name is required."); return; }
+    if (!Number.isInteger(quantity) || quantity < 0) { setError("Quantity must be a whole number, 0 or more."); return; }
+    const body = {
+      name: form.name.trim(), description: form.description.trim() || undefined,
+      serialNumber: form.serialNumber.trim() || undefined,
+      category: form.category, condition: form.condition, quantity,
+    };
+    const ok = await run(() => (editingId ? api.updateItem(editingId, body) : api.createItem(body)));
+    if (ok) setForm(null);
+  };
+
+  const remove = async (i: Item) => {
+    if (!confirm(`Delete "${i.name}"? Items that have been dispatched before cannot be deleted; retire them instead.`)) return;
+    await run(() => api.deleteItem(i.id));
+  };
+
+  const exportCsv = () => {
+    const rows = [["Name", "Category", "Serial", "Condition", "Quantity", "Dispatched", "Available"],
+      ...visible.map((i) => [i.name, i.category, i.serialNumber ?? "", i.condition, i.quantity, i.quantityDispatched, i.quantityAvailable])];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "inventory.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
 
   const filters: { key: Filter; label: string }[] = [
     { key: "All", label: "All Equipment" },
-    { key: "Good", label: "Good Condition" },
-    { key: "Maintenance", label: "Maintenance Needed" },
-    { key: "Retired", label: "Retired" },
+    { key: "GOOD", label: "Good Condition" },
+    { key: "DAMAGED", label: "Damaged" },
+    { key: "RETIRED", label: "Retired" },
   ];
-  const handleAddEquipment = () => {
-  if (!newEquipment.name || !newEquipment.tag || !newEquipment.location) {
-    alert("Please fill in all required fields.");
-    return;
-  }
-  if (editingTag) {
-    // Edit existing equipment
-    setItems((prev) =>
-      prev.map((item) =>
-        item.tag === editingTag ? newEquipment : item
-      )
-    );
-
-    setEditingTag(null);
-  } else {
-    // Add new equipment
-    setItems((prev) => [...prev, newEquipment]);
-  }
-
-  setNewEquipment({
-    name: "",
-    tag: "",
-    location: "",
-    condition: "Good",
-    nextInspection: "",
-  });
-
-  setShowAddEquipment(false);
-};
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold">Apparatus & Tactical Equipment Inventory</h1>
-          <p className="text-sm text-gray-600">
-            Real-time telemetry, preventive readings, battery checks, and maintenance
-            lifecycle for brigade assets.
-          </p>
+          <p className="text-sm text-gray-600">Stock levels, condition and live dispatch status for brigade assets.</p>
         </div>
         <div className="flex gap-2">
-          <button className="rounded border bg-white px-4 py-2 text-sm">Scan Asset Tag</button>
-          <button className="rounded border bg-white px-4 py-2 text-sm">Export CSV</button>
-          <button   onClick={() => setShowAddEquipment(true)}
-          className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white">
+          <button onClick={exportCsv} className="rounded border bg-white px-4 py-2 text-sm">Export CSV</button>
+          <button onClick={() => { setEditingId(null); setForm(emptyForm); }}
+            className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white">
             + Add Equipment / Asset
           </button>
         </div>
       </div>
 
-      {/* Stat cards */}
+      <ErrorBanner message={error ?? loadError} onDismiss={() => setError(null)} />
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <StatCard title="Total Tracked Assets">
-          <p className="text-3xl font-bold">44 <span className="text-base font-normal text-gray-500">Items</span></p>
-          <p className="text-xs text-gray-500">Across 4 facilities / apparatus</p>
+          <p className="text-3xl font-bold">{items.length} <span className="text-base font-normal text-gray-500">Items</span></p>
+          <p className="text-xs text-gray-500">{items.reduce((n, i) => n + i.quantity, 0)} units in stock</p>
         </StatCard>
-        <StatCard title="Operational Readiness">
-          <p className="text-3xl font-bold text-green-700">38 <span className="text-base font-normal">Ready</span></p>
-          <p className="text-xs text-gray-500">Passing all pre-shift checks</p>
+        <StatCard title="Ready to Dispatch">
+          <p className="text-3xl font-bold text-green-700">{ready} <span className="text-base font-normal">Ready</span></p>
+          <p className="text-xs text-gray-500">Good condition with free units</p>
         </StatCard>
-        <StatCard title="In Maintenance / Inspection">
-          <p className="text-3xl font-bold text-amber-600">4 <span className="text-base font-normal">Items</span></p>
-          <p className="text-xs text-gray-500">Active repair queue</p>
+        <StatCard title="Dispatched">
+          <p className="text-3xl font-bold text-amber-600">
+            {items.reduce((n, i) => n + i.quantityDispatched, 0)} <span className="text-base font-normal">Units</span>
+          </p>
+          <p className="text-xs text-gray-500">Currently out on incidents</p>
         </StatCard>
-        <StatCard title="Retired / Decommissioned">
-          <p className="text-3xl font-bold">2 <span className="text-base font-normal text-gray-500">Out of Service</span></p>
-          <p className="text-xs text-gray-500">Scheduled for disposal</p>
+        <StatCard title="Damaged / Retired">
+          <p className="text-3xl font-bold">{count("DAMAGED") + count("RETIRED")} <span className="text-base font-normal text-gray-500">Out of Service</span></p>
+          <p className="text-xs text-gray-500">{count("DAMAGED")} damaged · {count("RETIRED")} retired</p>
         </StatCard>
       </div>
 
-      {/* Filters + table */}
       <div className="rounded-lg border bg-white p-5">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {filters.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`rounded-full border px-3 py-1 text-sm ${
-                filter === f.key ? "bg-red-700 text-white" : "bg-white text-gray-700"
-              }`}
-            >
+            <button key={f.key} onClick={() => setFilter(f.key)}
+              className={`rounded-full border px-3 py-1 text-sm ${filter === f.key ? "bg-red-700 text-white" : "bg-white text-gray-700"}`}>
               {f.label} ({count(f.key)})
             </button>
           ))}
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search equipment..."
-            className="ml-auto w-64 rounded border px-3 py-1.5 text-sm"
-          />
+          <select value={category} onChange={(e) => setCategory(e.target.value as ItemCategory | "All")}
+            className="ml-auto rounded border px-2 py-1.5 text-sm">
+            <option value="All">All categories</option>
+            {ITEM_CATEGORIES.map((c) => <option key={c} value={c}>{label(c)}</option>)}
+          </select>
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search equipment..."
+            className="w-56 rounded border px-3 py-1.5 text-sm" />
         </div>
 
         <table className="w-full text-left text-sm">
           <thead className="text-xs uppercase text-gray-500">
             <tr>
-              <th className="py-2">Equipment / Item</th>
-              <th>Serial / Tag</th>
-              <th>Assigned Location</th>
-              <th>Condition</th>
-              <th>Next Inspection</th>
-              <th className="text-right">Actions</th>
+              <th className="py-2">Equipment / Item</th><th>Category</th><th>Serial</th>
+              <th>Condition</th><th>Stock</th><th>Availability</th><th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {visible.map((i) => (
-              <tr key={i.tag} className="border-t">
+              <tr key={i.id} className="border-t">
                 <td className="py-3 font-medium">{i.name}</td>
-                <td>{i.tag}</td>
-                <td>{i.location}</td>
-                <td>
-                  <StatusBadge tone={tones[i.condition]}>{i.condition}</StatusBadge>
-                </td>
-                <td>{i.nextInspection}</td>
+                <td>{label(i.category)}</td>
+                <td>{i.serialNumber ?? "—"}</td>
+                <td><StatusBadge tone={condTones[i.condition]}>{label(i.condition)}</StatusBadge></td>
+                <td>{i.quantityAvailable} / {i.quantity} free</td>
+                <td><StatusBadge tone={availTones[i.availability]}>{label(i.availability)}</StatusBadge></td>
                 <td className="text-right">
                   <div className="flex justify-end gap-2">
-                    <button
-                      onClick={() => {
-                        setNewEquipment(i);
-                        setEditingTag(i.tag);
-                        setShowAddEquipment(true);
-                      }}
-                      className="rounded border px-3 py-1 text-xs"
-                    >
-                      Edit
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setSelectedEquipment(i);
-                        setShowLogCheck(true);
-                      }}
-                      className="rounded border px-3 py-1 text-xs"
-                    >
-                      Log Check
-                    </button>
-
-                    {i.condition !== "Retired" && (
-                      <button
-                        onClick={() => {
-                          const confirmed = confirm(
-                            `Are you sure you want to retire "${i.name}"?`
-                          );
-
-                          if (confirmed) {
-                            setItems((prev) =>
-                              prev.map((item) =>
-                                item.tag === i.tag
-                                  ? {
-                                      ...item,
-                                      condition: "Retired",
-                                      nextInspection: "Archived",
-                                    }
-                                  : item
-                              )
-                            );
-                          }
-                        }}
-                        className="rounded border border-red-300 px-3 py-1 text-xs text-red-600"
-                      >
-                        Retire
-                      </button>
+                    <button onClick={() => openEdit(i)} className="rounded border px-3 py-1 text-xs">Edit</button>
+                    {i.condition !== "RETIRED" && (
+                      <button disabled={busy}
+                        onClick={() => confirm(`Retire "${i.name}"?`) && run(() => api.updateItem(i.id, { condition: "RETIRED" }))}
+                        className="rounded border border-red-300 px-3 py-1 text-xs text-red-600">Retire</button>
                     )}
-
-                    <button
-                      onClick={() => {
-                        setSelectedEquipment(i);
-                        setShowEquipmentDetails(true);
-                      }}
-                      className="rounded border px-3 py-1 text-xs"
-                    >
-                      View Details
-                    </button>
+                    <button onClick={() => setDetails(i)} className="rounded border px-3 py-1 text-xs">View Details</button>
+                    <button disabled={busy} onClick={() => remove(i)} className="rounded border px-3 py-1 text-xs">Delete</button>
                   </div>
                 </td>
               </tr>
             ))}
             {visible.length === 0 && (
-              <tr>
-                <td colSpan={6} className="py-6 text-center text-gray-500">
-                  No equipment found.
-                </td>
-              </tr>
+              <tr><td colSpan={7} className="py-6 text-center text-gray-500">{loading ? "Loading..." : "No equipment found."}</td></tr>
             )}
           </tbody>
         </table>
-        <p className="mt-3 text-xs text-gray-500">
-          Showing {visible.length} of {items.length} tracked assets
-        </p>
+        <p className="mt-3 text-xs text-gray-500">Showing {visible.length} of {items.length} tracked assets</p>
       </div>
 
-      {/* Bottom cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-lg border bg-white p-5">
-          <h2 className="mb-3 font-bold">Today's Inspection Pass Rate</h2>
-          <p className="text-sm">
-            Engine 4 Apparatus: <span className="font-semibold text-green-700">100% Passed</span>
-          </p>
-          <p className="text-sm">
-            Truck 2 Tactical Loadout: <span className="font-semibold text-green-700">100% Passed</span>
-          </p>
-          <p className="text-sm">
-            Rescue Squad Packs: <span className="font-semibold text-amber-600">80% Passed</span>
-          </p>
-          <button className="mt-3 w-full rounded bg-red-700 py-2 text-sm font-semibold text-white">
-            Submit Shift Morning Roll Call
-          </button>
-        </div>
-        <div className="rounded-lg border bg-white p-5">
-          <h2 className="mb-3 font-bold">Regulatory Standards</h2>
-          <p className="text-sm font-semibold">NFPA 1981 / 1852 Compliance</p>
-          <p className="mb-2 text-xs text-gray-500">All breathing apparatus pass the annual flow test.</p>
-          <p className="text-sm font-semibold">Cascade Air Refill Station</p>
-          <p className="text-xs text-gray-500">Last pressure check logged this week.</p>
-        </div>
-        <div className="rounded-lg border bg-white p-5">
-          <h2 className="mb-3 font-bold">Field Audit Barcode Hub</h2>
-          <p className="mb-3 text-sm text-gray-600">
-            Use a handheld scanner or mobile camera to audit equipment on the apparatus.
-          </p>
-          <button className="w-full rounded bg-red-700 py-2 text-sm font-semibold text-white">
-            Launch Field Audit Scanner
-          </button>
-        </div>
-      </div>
-
-      {/* Add Equipment Modal */}
-     {showAddEquipment && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-    <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-      
-      <h2 className="mb-5 text-xl font-bold">
-  {editingTag ? "Edit Equipment / Asset" : "Add Equipment / Asset"}
-</h2>
-
-      {/* Equipment Name */}
-      <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium">
-          Equipment Name *
-        </label>
-     
-       <input
-          type="text"
-          value={newEquipment.name}
-          onChange={(e) =>
-            setNewEquipment({
-              ...newEquipment,
-              name: e.target.value,
-            })
-          }
-          placeholder="e.g. Fire Hose"
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
-      </div>
-
-      {/* Serial / Tag */}
-      <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium">
-          Serial / Tag *
-        </label>
-        <input
-          type="text"
-          value={newEquipment.tag}
-          onChange={(e) =>
-            setNewEquipment({
-              ...newEquipment,
-              tag: e.target.value,
-            })
-          }
-          placeholder="e.g. HOSE-0211"
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
-      </div>
-
-      {/* Location */}
-      <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium">
-          Assigned Location *
-        </label>
-        <input
-          type="text"
-          value={newEquipment.location}
-          onChange={(e) =>
-            setNewEquipment({
-              ...newEquipment,
-              location: e.target.value,
-            })
-          }
-          placeholder="e.g. Engine 4"
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
-      </div>
-
-      {/* Condition */}
-      <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium">
-          Condition
-        </label>
-        <select
-          value={newEquipment.condition}
-          onChange={(e) =>
-            setNewEquipment({
-              ...newEquipment,
-              condition: e.target.value as Item["condition"],
-            })
-          }
-          className="w-full rounded border px-3 py-2 text-sm"
-        >
-          <option value="Good">Good</option>
-          <option value="Maintenance">Maintenance</option>
-          <option value="Retired">Retired</option>
-        </select>
-      </div>
-
-      {/* Next Inspection */}
-     <div className="mb-6">
-  <label className="mb-1 block text-sm font-medium">
-    Next Inspection
-  </label>
-
-  <input
-    type="text"
-    value={newEquipment.nextInspection}
-    onChange={(e) =>
-      setNewEquipment({
-        ...newEquipment,
-        nextInspection: e.target.value,
-      })
-    }
-                placeholder="e.g. 30 days"
-                className="w-full rounded border px-3 py-2 text-sm"
-              />
-          
-      </div>
-      {/* Buttons */}
-        <div className="flex justify-end gap-2">
-  <button
-    onClick={() => {
-      setShowAddEquipment(false);
-      setEditingTag(null);
-    }}
-    className="rounded border px-4 py-2 text-sm" 
-  >
-    Cancel
-   </button>
-
-  <button
-    onClick={handleAddEquipment}
-    className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white"
-  >
-    {editingTag ? "Save Changes" : "Add Equipment"}
-  </button> 
-
-    </div>
-  </div></div>      )}
-      {/* Log Equipment Check Modal */}
-{showLogCheck && selectedEquipment && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-    <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-
-      <h2 className="mb-5 text-xl font-bold">
-        Log Equipment Check
-      </h2>
-
-      <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium">
-          Equipment
-        </label>
-
-        <div className="rounded border bg-gray-50 px-3 py-2 text-sm">
-          {selectedEquipment.name}
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <label className="mb-2 block text-sm font-medium">
-          Check Result
-        </label>
-
-        <div className="flex gap-4">
-          <label>
-            <input
-              type="radio"
-              checked={checkResult === "Passed"}
-              onChange={() => setCheckResult("Passed")}
-            />
-            {" "}Passed
-          </label>
-
-          <label>
-            <input
-              type="radio"
-              checked={checkResult === "Failed"}
-              onChange={() => setCheckResult("Failed")}
-            />
-            {" "}Failed
-          </label>
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium">
-          Inspector
-        </label>
-
-        <input
-          type="text"
-          value={inspector}
-          onChange={(e) => setInspector(e.target.value)}
-          placeholder="Enter inspector name"
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
-      </div>
-
-      <div className="mb-6">
-        <label className="mb-1 block text-sm font-medium">
-          Notes
-        </label>
-
-        <textarea
-          value={checkNotes}
-          onChange={(e) => setCheckNotes(e.target.value)}
-          placeholder="Enter inspection notes"
-          rows={3}
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
-      </div>
-
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => {
-            setShowLogCheck(false);
-            setSelectedEquipment(null);
-            setInspector("");
-            setCheckNotes("");
-            setCheckResult("Passed");
-          }}
-          className="rounded border px-4 py-2 text-sm"
-        >
-          Cancel
-        </button>
-
-        <button
-          onClick={() => {
-            alert(
-              `Equipment check saved!\n\nEquipment: ${selectedEquipment.name}\nResult: ${checkResult}\nInspector: ${inspector}`
-            );
-
-            setShowLogCheck(false);
-            setSelectedEquipment(null);
-            setInspector("");
-            setCheckNotes("");
-            setCheckResult("Passed");
-          }}
-          className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white"
-        >
-          Save Check
-        </button>
-      </div>
-
-    </div>
-  </div>
-)}
-      {showEquipmentDetails && selectedEquipment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-
-            <h2 className="mb-5 text-xl font-bold">
-              Equipment Details
-            </h2>
-
-            <div className="space-y-4">
-
-              <div>
-                <p className="text-xs text-gray-500">
-                  Equipment Name
-                </p>
-                <p className="font-medium">
-                  {selectedEquipment.name}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500">
-                  Serial / Tag
-                </p>
-                <p className="font-medium">
-                  {selectedEquipment.tag}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500">
-                  Assigned Location
-                </p>
-                <p className="font-medium">
-                  {selectedEquipment.location}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500">
-                  Condition
-                </p>
-                <p className="font-medium">
-                  {selectedEquipment.condition}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500">
-                  Next Inspection
-                </p>
-                <p className="font-medium">
-                  {selectedEquipment.nextInspection}
-                </p>
-              </div>
-
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => {
-                  setShowEquipmentDetails(false);
-                  setSelectedEquipment(null);
-                }}
-                className="rounded border px-4 py-2 text-sm"
-              >
-                Close
-              </button>
-            </div>
-
+      {form && (
+        <Modal title={editingId ? "Edit Equipment / Asset" : "Add Equipment / Asset"} onClose={() => setForm(null)}>
+          <Field label="Equipment Name *">
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Fire Suit" className={inputCls} />
+          </Field>
+          <Field label="Description">
+            <input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputCls} />
+          </Field>
+          <Field label="Serial Number">
+            <input value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })}
+              placeholder="e.g. ABC 123" className={inputCls} />
+          </Field>
+          <Field label="Category">
+            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as ItemCategory })} className={inputCls}>
+              {ITEM_CATEGORIES.map((c) => <option key={c} value={c}>{label(c)}</option>)}
+            </select>
+          </Field>
+          <Field label="Condition">
+            <select value={form.condition} onChange={(e) => setForm({ ...form, condition: e.target.value as ItemCondition })} className={inputCls}>
+              <option value="GOOD">Good</option><option value="DAMAGED">Damaged</option><option value="RETIRED">Retired</option>
+            </select>
+          </Field>
+          <Field label="Quantity (e.g. 10 suits is one row; an engine is 1)">
+            <input type="number" min={0} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className={inputCls} />
+          </Field>
+          <ErrorBanner message={error} />
+          <div className="mt-4 flex justify-end gap-2">
+            <button onClick={() => setForm(null)} className="rounded border px-4 py-2 text-sm">Cancel</button>
+            <button onClick={save} disabled={busy}
+              className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              {editingId ? "Save Changes" : "Add Equipment"}
+            </button>
           </div>
-        </div>
+        </Modal>
       )}
 
+      {details && (
+        <Modal title="Equipment Details" onClose={() => setDetails(null)}>
+          <div className="space-y-4">
+            {([
+              ["Equipment Name", details.name], ["Description", details.description ?? "—"],
+              ["Serial", details.serialNumber ?? "—"], ["Category", label(details.category)],
+              ["Condition", label(details.condition)], ["Availability", label(details.availability)],
+              ["Quantity", `${details.quantity} total · ${details.quantityDispatched} dispatched · ${details.quantityAvailable} available`],
+              ["Last Maintained", details.lastMaintained ?? "—"],
+            ] as const).map(([k, v]) => (
+              <div key={k}><p className="text-xs text-gray-500">{k}</p><p className="font-medium">{v}</p></div>
+            ))}
+          </div>
+          <div className="mt-6 flex justify-end">
+            <button onClick={() => setDetails(null)} className="rounded border px-4 py-2 text-sm">Close</button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
