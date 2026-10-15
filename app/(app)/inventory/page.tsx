@@ -5,23 +5,31 @@ import Modal, { Field, inputCls } from "@/components/Modal";
 import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
 import {
-  api, errMsg, ITEM_CATEGORIES, label, type Item, type ItemCategory, type ItemCondition,
+  api, errMsg, fmtDate, ITEM_CATEGORIES, label, todayManila,
+  type InventoryAlert, type Item, type ItemCategory, type ItemCondition,
 } from "@/lib/api";
 import { useLoad } from "@/lib/useLoad";
 
 const condTones = { GOOD: "green", DAMAGED: "amber", RETIRED: "gray" } as const;
 const availTones = { AVAILABLE: "green", PARTIALLY_DISPATCHED: "amber", DISPATCHED: "red", UNAVAILABLE: "gray" } as const;
 type Filter = "All" | ItemCondition;
+const alertLabel: Record<InventoryAlert["type"], string> = {
+  EXPIRED: "Expired", EXPIRING_SOON: "Expiring soon", MAINTENANCE_DUE: "Maintenance due",
+  LOW_STOCK: "Low stock", VEHICLE_DAMAGED: "Damaged vehicle",
+};
 
 type Form = {
   name: string; description: string; serialNumber: string;
   category: ItemCategory; condition: ItemCondition; quantity: string;
+  lastMaintained: string; expiryDate: string;
 };
-const emptyForm: Form = { name: "", description: "", serialNumber: "", category: "OTHER", condition: "GOOD", quantity: "1" };
+const emptyForm: Form = { name: "", description: "", serialNumber: "", category: "OTHER", condition: "GOOD", quantity: "1", lastMaintained: "", expiryDate: "" };
 
 export default function InventoryPage() {
   const { data: items, error: loadError, loading, reload } = useLoad(() => api.listItems(), [] as Item[]);
+  const { data: alerts, reload: reloadAlerts } = useLoad(() => api.listAlerts(), [] as InventoryAlert[]);
   const [error, setError] = useState<string | null>(null);
+  const [alertsOnly, setAlertsOnly] = useState(false);
   const [filter, setFilter] = useState<Filter>("All");
   const [category, setCategory] = useState<ItemCategory | "All">("All");
   const [query, setQuery] = useState("");
@@ -30,10 +38,13 @@ export default function InventoryPage() {
   const [details, setDetails] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const alertsByItem = (id: number) => alerts.filter((a) => a.itemId === id);
+  const categoryAlerts = alerts.filter((a) => a.itemId === null);
   const visible = items.filter(
     (i) =>
       (filter === "All" || i.condition === filter) &&
       (category === "All" || i.category === category) &&
+      (!alertsOnly || alertsByItem(i.id).length > 0) &&
       (i.name + (i.serialNumber ?? "")).toLowerCase().includes(query.toLowerCase())
   );
   const count = (f: Filter) => (f === "All" ? items.length : items.filter((i) => i.condition === f).length);
@@ -42,7 +53,7 @@ export default function InventoryPage() {
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
-    try { await fn(); await reload(); return true; }
+    try { await fn(); await Promise.all([reload(), reloadAlerts()]); return true; }
     catch (e) { setError(errMsg(e)); return false; }
     finally { setBusy(false); }
   };
@@ -52,6 +63,7 @@ export default function InventoryPage() {
     setForm({
       name: i.name, description: i.description ?? "", serialNumber: i.serialNumber ?? "",
       category: i.category, condition: i.condition, quantity: String(i.quantity),
+      lastMaintained: i.lastMaintained ?? "", expiryDate: i.expiryDate ?? "",
     });
   };
 
@@ -64,8 +76,17 @@ export default function InventoryPage() {
       name: form.name.trim(), description: form.description.trim() || undefined,
       serialNumber: form.serialNumber.trim() || undefined,
       category: form.category, condition: form.condition, quantity,
+      expiryDate: form.expiryDate || undefined,
     };
-    const ok = await run(() => (editingId ? api.updateItem(editingId, body) : api.createItem(body)));
+    const ok = await run(async () => {
+      if (editingId) {
+        await api.updateItem(editingId, { ...body, lastMaintained: form.lastMaintained || undefined });
+      } else {
+        const created = await api.createItem(body);
+        // The create call has no maintenance date, so record it right after.
+        if (form.lastMaintained) await api.updateItem(created.id, { lastMaintained: form.lastMaintained });
+      }
+    });
     if (ok) setForm(null);
   };
 
@@ -75,8 +96,8 @@ export default function InventoryPage() {
   };
 
   const exportCsv = () => {
-    const rows = [["Name", "Category", "Serial", "Condition", "Quantity", "Dispatched", "Available"],
-      ...visible.map((i) => [i.name, i.category, i.serialNumber ?? "", i.condition, i.quantity, i.quantityDispatched, i.quantityAvailable])];
+    const rows = [["Name", "Category", "Serial", "Condition", "Quantity", "Dispatched", "Available", "Last maintained", "Expiry"],
+      ...visible.map((i) => [i.name, i.category, i.serialNumber ?? "", i.condition, i.quantity, i.quantityDispatched, i.quantityAvailable, i.lastMaintained ?? "", i.expiryDate ?? ""])];
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -131,6 +152,21 @@ export default function InventoryPage() {
         </StatCard>
       </div>
 
+      {alerts.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <h2 className="mb-2 text-sm font-bold text-amber-800">Needs attention ({alerts.length})</h2>
+          <ul className="space-y-1 text-sm">
+            {alerts.map((a, n) => (
+              <li key={n} className="flex items-start gap-2">
+                <StatusBadge tone={a.severity === "HIGH" ? "red" : "amber"}>{alertLabel[a.type]}</StatusBadge>
+                <span>{a.message}</span>
+              </li>
+            ))}
+          </ul>
+          {categoryAlerts.length > 0 && <p className="mt-2 text-xs text-gray-500">Low-stock thresholds are set in Settings → Inventory Rules.</p>}
+        </div>
+      )}
+
       <div className="rounded-lg border bg-white p-5">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {filters.map((f) => (
@@ -139,6 +175,10 @@ export default function InventoryPage() {
               {f.label} ({count(f.key)})
             </button>
           ))}
+          <button onClick={() => setAlertsOnly(!alertsOnly)}
+            className={`rounded-full border px-3 py-1 text-sm ${alertsOnly ? "bg-amber-600 text-white" : "bg-white text-gray-700"}`}>
+            Needs attention ({items.filter((i) => alertsByItem(i.id).length > 0).length})
+          </button>
           <select value={category} onChange={(e) => setCategory(e.target.value as ItemCategory | "All")}
             className="ml-auto rounded border px-2 py-1.5 text-sm">
             <option value="All">All categories</option>
@@ -152,21 +192,36 @@ export default function InventoryPage() {
           <thead className="text-xs uppercase text-gray-500">
             <tr>
               <th className="py-2">Equipment / Item</th><th>Category</th><th>Serial</th>
-              <th>Condition</th><th>Stock</th><th>Availability</th><th className="text-right">Actions</th>
+              <th>Condition</th><th>Stock</th><th>Maintained / Expires</th><th>Availability</th><th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {visible.map((i) => (
               <tr key={i.id} className="border-t">
-                <td className="py-3 font-medium">{i.name}</td>
+                <td className="py-3 font-medium">
+                  {i.name}
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {alertsByItem(i.id).map((a, n) => (
+                      <span key={n} title={a.message}><StatusBadge tone={a.severity === "HIGH" ? "red" : "amber"}>{alertLabel[a.type]}</StatusBadge></span>
+                    ))}
+                  </div>
+                </td>
                 <td>{label(i.category)}</td>
                 <td>{i.serialNumber ?? "—"}</td>
                 <td><StatusBadge tone={condTones[i.condition]}>{label(i.condition)}</StatusBadge></td>
                 <td>{i.quantityAvailable} / {i.quantity} free</td>
+                <td className="text-xs">
+                  <p>Maintained: {i.lastMaintained ? fmtDate(i.lastMaintained) : "—"}</p>
+                  {i.expiryDate && <p>Expires: {fmtDate(i.expiryDate)}</p>}
+                </td>
                 <td><StatusBadge tone={availTones[i.availability]}>{label(i.availability)}</StatusBadge></td>
                 <td className="text-right">
                   <div className="flex justify-end gap-2">
                     <button onClick={() => openEdit(i)} className="rounded border px-3 py-1 text-xs">Edit</button>
+                    {i.condition !== "RETIRED" && (
+                      <button disabled={busy} onClick={() => run(() => api.updateItem(i.id, { lastMaintained: todayManila() }))}
+                        className="rounded border px-3 py-1 text-xs">Maintained today</button>
+                    )}
                     {i.condition !== "RETIRED" && (
                       <button disabled={busy}
                         onClick={() => confirm(`Retire "${i.name}"?`) && run(() => api.updateItem(i.id, { condition: "RETIRED" }))}
@@ -179,7 +234,7 @@ export default function InventoryPage() {
               </tr>
             ))}
             {visible.length === 0 && (
-              <tr><td colSpan={7} className="py-6 text-center text-gray-500">{loading ? "Loading..." : "No equipment found."}</td></tr>
+              <tr><td colSpan={8} className="py-6 text-center text-gray-500">{loading ? "Loading..." : "No equipment found."}</td></tr>
             )}
           </tbody>
         </table>
@@ -212,6 +267,14 @@ export default function InventoryPage() {
           <Field label="Quantity (e.g. 10 suits is one row; an engine is 1)">
             <input type="number" min={0} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className={inputCls} />
           </Field>
+          <Field label="Last maintained">
+            <input type="date" max={todayManila()} value={form.lastMaintained}
+              onChange={(e) => setForm({ ...form, lastMaintained: e.target.value })} className={inputCls} />
+          </Field>
+          <Field label="Expiry date (for items that expire; cannot be cleared once set)">
+            <input type="date" value={form.expiryDate}
+              onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className={inputCls} />
+          </Field>
           <ErrorBanner message={error} />
           <div className="mt-4 flex justify-end gap-2">
             <button onClick={() => setForm(null)} className="rounded border px-4 py-2 text-sm">Cancel</button>
@@ -231,7 +294,8 @@ export default function InventoryPage() {
               ["Serial", details.serialNumber ?? "—"], ["Category", label(details.category)],
               ["Condition", label(details.condition)], ["Availability", label(details.availability)],
               ["Quantity", `${details.quantity} total · ${details.quantityDispatched} dispatched · ${details.quantityAvailable} available`],
-              ["Last Maintained", details.lastMaintained ?? "—"],
+              ["Last Maintained", details.lastMaintained ? fmtDate(details.lastMaintained) : "—"],
+              ["Expiry Date", details.expiryDate ? fmtDate(details.expiryDate) : "—"],
             ] as const).map(([k, v]) => (
               <div key={k}><p className="text-xs text-gray-500">{k}</p><p className="font-medium">{v}</p></div>
             ))}

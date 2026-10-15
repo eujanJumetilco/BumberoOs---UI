@@ -9,7 +9,7 @@ import ErrorBanner from "@/components/ErrorBanner";
 import ReportIncidentModal from "@/components/ReportIncidentModal";
 import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
-import { api, fmtDateTime, label, type Incident, type Item, type Staff } from "@/lib/api";
+import { api, fmtDateTime, label, type Incident, type InventoryAlert, type Item, type Staff } from "@/lib/api";
 import { hasPosition } from "@/lib/map";
 import { useLoad } from "@/lib/useLoad";
 
@@ -29,12 +29,14 @@ export default function DashboardPage() {
 
   const { data, error, reload } = useLoad(
     async () => {
-      const [staff, items, incidents] = await Promise.all([api.listStaff(), api.listItems(), api.listIncidents()]);
-      return { staff, items, incidents };
+      const [staff, items, incidents, alerts] = await Promise.all([
+        api.listStaff(), api.listItems(), api.listIncidents(), api.listAlerts(),
+      ]);
+      return { staff, items, incidents, alerts };
     },
-    { staff: [] as Staff[], items: [] as Item[], incidents: [] as Incident[] },
+    { staff: [] as Staff[], items: [] as Item[], incidents: [] as Incident[], alerts: [] as InventoryAlert[] },
   );
-  const { staff, items, incidents } = data;
+  const { staff, items, incidents, alerts } = data;
 
   // Sidebar "Quick Dispatch" links here with ?report=1
   useEffect(() => {
@@ -191,7 +193,25 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border bg-white p-5 self-start">
+        <div className="space-y-6 self-start">
+        <div className="rounded-lg border bg-white p-5">
+          <div className="mb-3 flex justify-between">
+            <h2 className="font-bold">Equipment Alerts{alerts.length > 0 && ` (${alerts.length})`}</h2>
+            <Link href="/inventory" className="text-sm text-red-700">Inventory</Link>
+          </div>
+          <ul className="space-y-2 text-sm">
+            {alerts.slice(0, 6).map((a, n) => (
+              <li key={n} className="flex items-start gap-2">
+                <StatusBadge tone={a.severity === "HIGH" ? "red" : "amber"}>{a.severity === "HIGH" ? "Urgent" : "Soon"}</StatusBadge>
+                <span>{a.message}</span>
+              </li>
+            ))}
+            {alerts.length > 6 && <li className="text-xs text-gray-500">and {alerts.length - 6} more in Inventory.</li>}
+            {alerts.length === 0 && <li className="text-gray-500">Nothing needs attention.</li>}
+          </ul>
+        </div>
+
+        <div className="rounded-lg border bg-white p-5">
           <h2 className="mb-3 font-bold">Apparatus Bay Status</h2>
           <ul className="space-y-3">
             {vehicles.map((v) => (
@@ -205,6 +225,7 @@ export default function DashboardPage() {
             ))}
             {vehicles.length === 0 && <li className="text-sm text-gray-500">No engines or ambulances tracked.</li>}
           </ul>
+        </div>
         </div>
       </div>
 

@@ -50,6 +50,34 @@ export type Item = {
   quantityDispatched: number;
   quantityAvailable: number;
   availability: ItemAvailability;
+  /** For items that expire (extinguishers, medical stock). */
+  expiryDate: string | null;
+};
+
+export type AlertType = "EXPIRED" | "EXPIRING_SOON" | "MAINTENANCE_DUE" | "LOW_STOCK" | "VEHICLE_DAMAGED";
+export type AlertSeverity = "HIGH" | "MEDIUM";
+
+/** itemId is null for category-wide alerts such as LOW_STOCK. */
+export type InventoryAlert = {
+  type: AlertType;
+  severity: AlertSeverity;
+  itemId: number | null;
+  itemName: string | null;
+  category: ItemCategory;
+  message: string;
+};
+
+export type CategoryRule = {
+  category: ItemCategory;
+  lowStockThreshold: number;
+  /** null = use the station-wide interval, 0 = no reminders for this category. */
+  maintenanceIntervalDays: number | null;
+};
+
+export type InventoryRules = {
+  defaultMaintenanceIntervalDays: number;
+  expiryWarningDays: number;
+  categories: CategoryRule[];
 };
 
 export type StaffAssignment = {
@@ -195,11 +223,14 @@ export const api = {
     request<Item[]>("GET", `/items${qs(f)}`),
   createItem: (b: {
     name: string; description?: string; quantity: number; condition: ItemCondition;
-    category: ItemCategory; serialNumber?: string;
+    category: ItemCategory; serialNumber?: string; expiryDate?: string;
   }) => request<Item>("POST", "/items", b),
   updateItem: (id: number, b: Partial<Omit<Item, "id" | "quantityDispatched" | "quantityAvailable" | "availability">>) =>
     request<Item>("PATCH", `/items/${id}`, b),
   deleteItem: (id: number) => request<void>("DELETE", `/items/${id}`),
+  listAlerts: () => request<InventoryAlert[]>("GET", "/items/alerts"),
+  getInventoryRules: () => request<InventoryRules>("GET", "/settings/inventory-rules"),
+  saveInventoryRules: (b: InventoryRules) => request<InventoryRules>("PUT", "/settings/inventory-rules", b),
 
   // Incidents
   listIncidents: (f: { status?: IncidentStatus; nature?: IncidentNature } = {}) =>
@@ -242,7 +273,14 @@ const fmt = (iso: string | null | undefined, opts: Intl.DateTimeFormatOptions) =
 
 export const fmtDateTime = (iso: string | null | undefined) => fmt(iso, { dateStyle: "medium", timeStyle: "short" });
 
+/** A date-only value such as 2026-10-15. Formatted as-is, so no timezone can shift the day. */
+export const fmtDate = (d: string | null | undefined) =>
+  d ? new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { dateStyle: "medium", timeZone: "UTC" }) : "—";
+
 export const fmtTime = (iso: string | null | undefined) => fmt(iso, { timeStyle: "medium" });
+
+/** Today's date in Philippine time, as YYYY-MM-DD, for date-only fields such as last maintained. */
+export const todayManila = () => new Date().toLocaleDateString("en-CA", { timeZone: DISPLAY_TIMEZONE });
 
 /** Current moment as a UTC timestamp for the server, which stores zone-less LocalDateTime in UTC. */
 export const nowUtc = () => new Date().toISOString().slice(0, 19);

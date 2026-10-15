@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import InventoryRulesPanel from "@/components/InventoryRulesPanel";
 import UserManagement from "@/components/UserManagement";
 import { fmtDateTime, nowUtc } from "@/lib/api";
 import { useAccount } from "@/lib/auth";
@@ -125,14 +126,6 @@ function Preferences({ s }: { s: Settings }) {
   );
 }
 
-function ComingSoon({ title, text }: { title: string; text: string }) {
-  return (
-    <Section title={title}>
-      <p className="text-sm text-gray-600">{text}</p>
-    </Section>
-  );
-}
-
 export default function SettingsPage() {
   const account = useAccount();
   const s = useSettings();
@@ -175,10 +168,7 @@ export default function SettingsPage() {
       <div className={active === "users" ? "" : "max-w-3xl"}>
         {active === "appearance" && <Appearance s={s} />}
         {active === "preferences" && <Preferences s={s} />}
-        {active === "inventory" && (
-          <ComingSoon title="Inventory rules"
-            text="Maintenance reminders, per-category low-stock thresholds and expiry warnings are shared across all dispatchers, so they will be stored on the server. Not available yet." />
-        )}
+        {active === "inventory" && <InventoryRulesPanel canEdit={isAdmin} />}
         {active === "users" && isAdmin && <UserManagement />}
       </div>
     </div>
