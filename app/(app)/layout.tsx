@@ -1,13 +1,15 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { Fragment, useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import { useAccount } from "@/lib/auth";
+import { useSettings } from "@/lib/settings";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const account = useAccount();
   const router = useRouter();
+  const { timeFormat } = useSettings();
 
   useEffect(() => {
     if (account === null) router.replace("/");
@@ -20,7 +22,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6">
+          {/* Timestamps are formatted when rendered, so remount the page when the format changes. */}
+          <Fragment key={timeFormat}>{children}</Fragment>
+        </main>
       </div>
     </div>
   );

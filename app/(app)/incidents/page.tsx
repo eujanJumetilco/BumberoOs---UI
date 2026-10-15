@@ -5,15 +5,16 @@ import Modal, { inputCls } from "@/components/Modal";
 import ReportIncidentModal from "@/components/ReportIncidentModal";
 import StatusBadge from "@/components/StatusBadge";
 import {
-  ALARM_LEVELS, api, errMsg, fmtDateTime, fmtTime, label,
+  ALARM_LEVELS, api, errMsg, fmtDateTime, fmtTime, label, nowUtc,
   type AlarmLevel, type Incident, type IncidentStatus, type Item, type ItemCondition, type Staff,
 } from "@/lib/api";
+import { getSettings } from "@/lib/settings";
 
 type Filter = "ALL" | IncidentStatus;
 
 export default function IncidentsPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [filter, setFilter] = useState<Filter>("ALL");
+  const [filter, setFilter] = useState<Filter>(() => getSettings().incidentsFilter);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [availStaff, setAvailStaff] = useState<Staff[]>([]);
   const [availItems, setAvailItems] = useState<Item[]>([]);
@@ -153,11 +154,11 @@ export default function IncidentsPage() {
                 )}
                 <div className="ml-auto flex flex-wrap gap-2">
                   {!selected.underControlAt && open && (
-                    <button disabled={busy} onClick={() => act(() => api.updateIncident(selected.id, { underControlAt: new Date().toISOString().slice(0, 19) }))}
+                    <button disabled={busy} onClick={() => act(() => api.updateIncident(selected.id, { underControlAt: nowUtc() }))}
                       className="rounded border px-3 py-1.5 text-xs">Mark Under Control</button>
                   )}
                   {!selected.fireOutAt && open && (
-                    <button disabled={busy} onClick={() => act(() => api.updateIncident(selected.id, { fireOutAt: new Date().toISOString().slice(0, 19) }))}
+                    <button disabled={busy} onClick={() => act(() => api.updateIncident(selected.id, { fireOutAt: nowUtc() }))}
                       className="rounded border px-3 py-1.5 text-xs">Mark Fire Out</button>
                   )}
                   {open ? (

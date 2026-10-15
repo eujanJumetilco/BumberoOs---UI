@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, errMsg } from "@/lib/api";
 import { setAccount, useAccount } from "@/lib/auth";
+import { getSettings, landingPath } from "@/lib/settings";
 
 const input = "w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-red-500";
 
@@ -19,7 +20,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (account) router.replace("/dashboard");
+    if (account) router.replace(landingPath(getSettings()));
   }, [account, router]);
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export default function Home() {
         ? await api.signup({ email, password, displayName: displayName || undefined, role: "ADMIN" })
         : await api.signin(email, password);
       setAccount(acct);
-      router.replace("/dashboard");
+      router.replace(landingPath(getSettings()));
     } catch (err) {
       setError(errMsg(err));
     } finally {

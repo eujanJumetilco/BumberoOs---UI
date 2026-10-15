@@ -1,4 +1,6 @@
 // Typed client for the BumberoOS REST API (see Server_Guide.md).
+import { getSettings } from "./settings";
+import { DISPLAY_TIMEZONE } from "./settingsShared";
 
 export type StaffAvailability = "UNAVAILABLE" | "AVAILABLE" | "DISPATCHED";
 export type IncidentNature = "EMERGENCY" | "NON_EMERGENCY";
@@ -195,10 +197,20 @@ export const api = {
 export const label = (v: string | null | undefined) =>
   v ? v.toLowerCase().split("_").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ") : "—";
 
-export const fmtDateTime = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "—";
+// The server sends UTC. Everything is shown in Philippine time, in the saved 12h/24h format.
+// Timestamps without a zone suffix are treated as UTC, so older responses still read correctly.
+const toDate = (iso: string) => new Date(/(Z|[+-]\d\d:?\d\d)$/.test(iso) ? iso : `${iso}Z`);
 
-export const fmtTime = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleTimeString("en-GB") : "—";
+const fmt = (iso: string | null | undefined, opts: Intl.DateTimeFormatOptions) =>
+  iso
+    ? toDate(iso).toLocaleString("en-GB", { ...opts, hour12: getSettings().timeFormat === "12h", timeZone: DISPLAY_TIMEZONE })
+    : "—";
+
+export const fmtDateTime = (iso: string | null | undefined) => fmt(iso, { dateStyle: "medium", timeStyle: "short" });
+
+export const fmtTime = (iso: string | null | undefined) => fmt(iso, { timeStyle: "medium" });
+
+/** Current moment as a UTC timestamp for the server, which stores zone-less LocalDateTime in UTC. */
+export const nowUtc = () => new Date().toISOString().slice(0, 19);
 
 export const errMsg = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
