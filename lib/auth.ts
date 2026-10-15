@@ -2,8 +2,8 @@
 import { useSyncExternalStore } from "react";
 import type { Account } from "./api";
 
-// The server issues no token (see Server_Guide.md security note), so the signed-in
-// account is only kept in localStorage to gate the UI.
+// The server keeps the real login in an HttpOnly session cookie. This copy of the account only
+// lets the UI render straight away; the app shell re-checks it with /auth/me, and any 401 clears it.
 const KEY = "bumberoos.account";
 const listeners = new Set<() => void>();
 let cache: { raw: string | null; value: Account | null } = { raw: null, value: null };

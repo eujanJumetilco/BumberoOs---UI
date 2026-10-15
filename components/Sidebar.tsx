@@ -2,6 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { api } from "@/lib/api";
 import { setAccount } from "@/lib/auth";
 
 const links = [
@@ -51,7 +52,11 @@ export default function Sidebar() {
       <div className="flex flex-col gap-1 text-sm text-gray-600">
         <Link href="/help" className="px-3 py-2">Help & Support</Link>
         <button
-          onClick={() => { setAccount(null); router.replace("/"); }}
+          onClick={async () => {
+            try { await api.signout(); } catch { /* already signed out, or offline */ }
+            setAccount(null);
+            router.replace("/");
+          }}
           className="px-3 py-2 text-left"
         >
           Log Out

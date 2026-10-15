@@ -1,4 +1,5 @@
 // Typed client for the BumberoOS REST API (see Server_Guide.md).
+import { setAccount } from "./auth";
 import { getSettings } from "./settings";
 import { DISPLAY_TIMEZONE } from "./settingsShared";
 
@@ -100,6 +101,8 @@ export type Account = {
   role: UserRole;
   displayName: string | null;
   enabled: boolean;
+  staffId: number | null;
+  createdAt: string | null;
 };
 
 export type NewIncident = {
@@ -139,6 +142,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (text) {
     try { data = JSON.parse(text); } catch { data = undefined; }
   }
+  // The session ended (expired, or the account was disabled): drop the cached sign-in so the app returns to login.
+  if (res.status === 401) setAccount(null);
   if (!res.ok) {
     const msg = (data as { error?: string } | undefined)?.error;
     throw new ApiError(res.status, msg ?? `Request failed (${res.status})`);
@@ -159,6 +164,22 @@ export const api = {
   signin: (email: string, password: string) => request<Account>("POST", "/auth/signin", { email, password }),
   signup: (b: { email: string; password: string; displayName?: string; role?: UserRole }) =>
     request<Account>("POST", "/auth/signup", b),
+
+  me: () => request<Account>("GET", "/auth/me"),
+  signout: () => request<void>("POST", "/auth/signout"),
+
+  // Accounts (admin only)
+  listAccounts: () => request<Account[]>("GET", "/accounts"),
+  /** Adds an account. The server keeps the current admin signed in. */
+  createAccount: (b: { email: string; password: string; displayName?: string; role: UserRole }) =>
+    request<Account>("POST", "/auth/signup", b),
+  setAccountEnabled: (id: number, value: boolean) =>
+    request<Account>("PATCH", `/accounts/${id}/enabled${qs({ value })}`),
+  setAccountRole: (id: number, value: UserRole) =>
+    request<Account>("PATCH", `/accounts/${id}/role${qs({ value })}`),
+  linkAccountStaff: (id: number, staffId: number) => request<Account>("PUT", `/accounts/${id}/staff/${staffId}`),
+  unlinkAccountStaff: (id: number) => request<Account>("DELETE", `/accounts/${id}/staff`),
+  deleteAccount: (id: number) => request<void>("DELETE", `/accounts/${id}`),
 
   // Staff
   listStaff: (availability?: StaffAvailability) =>

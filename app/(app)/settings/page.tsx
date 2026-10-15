@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import UserManagement from "@/components/UserManagement";
 import { fmtDateTime, nowUtc } from "@/lib/api";
 import { useAccount } from "@/lib/auth";
 import {
@@ -171,17 +172,14 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      <div className="max-w-3xl">
+      <div className={active === "users" ? "" : "max-w-3xl"}>
         {active === "appearance" && <Appearance s={s} />}
         {active === "preferences" && <Preferences s={s} />}
         {active === "inventory" && (
           <ComingSoon title="Inventory rules"
             text="Maintenance reminders, per-category low-stock thresholds and expiry warnings are shared across all dispatchers, so they will be stored on the server. Not available yet." />
         )}
-        {active === "users" && (
-          <ComingSoon title="User management"
-            text="Listing, adding, enabling or disabling accounts and changing roles will appear here once the server enforces admin-only access. Not available yet." />
-        )}
+        {active === "users" && isAdmin && <UserManagement />}
       </div>
     </div>
   );
