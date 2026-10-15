@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import ErrorBanner from "@/components/ErrorBanner";
 import Modal, { inputCls } from "@/components/Modal";
+import CommandPanel from "@/components/CommandPanel";
 import ReportIncidentModal from "@/components/ReportIncidentModal";
 import StatusBadge from "@/components/StatusBadge";
 import {
@@ -74,6 +75,8 @@ export default function IncidentsPage() {
       { at: i.assignedAt, title: "Equipment Dispatched", text: `${i.name} × ${i.quantity}` },
       ...(i.releasedAt ? [{ at: i.releasedAt, title: "Equipment Returned", text: `${i.name}${i.returnCondition ? ` — ${label(i.returnCondition)}` : ""}` }] : []),
     ]),
+    ...(selected.arrivedAt ? [{ at: selected.arrivedAt, title: "Arrived on Scene", text: selected.commanderName ? `Reporting to ${selected.commanderName}` : "" }] : []),
+    ...selected.commanderOrders.map((o) => ({ at: o.issuedAt, title: "Commander's Order", text: o.instruction })),
     ...(selected.underControlAt ? [{ at: selected.underControlAt, title: "Under Control", text: "" }] : []),
     ...(selected.fireOutAt ? [{ at: selected.fireOutAt, title: "Fire Out", text: "" }] : []),
     ...(selected.resolvedAt ? [{ at: selected.resolvedAt, title: "Resolved", text: "" }] : []),
@@ -178,6 +181,8 @@ export default function IncidentsPage() {
               </div>
             </div>
 
+            <CommandPanel key={selected.id} incident={selected} open={open} busy={busy} act={act} />
+
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {/* Staff */}
               <div className="rounded-lg border bg-white p-5">
@@ -185,7 +190,7 @@ export default function IncidentsPage() {
                 <ul className="mb-3 space-y-2 text-sm">
                   {activeStaff.map((s) => (
                     <li key={s.staffId} className="flex items-center justify-between rounded bg-gray-50 p-2">
-                      <span>{s.name}{s.role && <span className="text-xs text-gray-500"> · {s.role}</span>}</span>
+                      <span>{s.name}{s.badgeNumber && <span className="text-xs text-gray-500"> · ID {s.badgeNumber}</span>}{s.role && <span className="text-xs text-gray-500"> · {s.role}</span>}</span>
                       {open && <button disabled={busy} onClick={() => act(() => api.releaseStaff(selected.id, s.staffId))}
                         className="text-xs text-red-600">Release</button>}
                     </li>
@@ -196,7 +201,7 @@ export default function IncidentsPage() {
                   <div className="flex gap-2">
                     <select value={staffPick} onChange={(e) => setStaffPick(e.target.value)} className={inputCls}>
                       <option value="">Assign staff...</option>
-                      {availStaff.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {availStaff.map((p) => <option key={p.id} value={p.id}>{p.name}{p.badgeNumber ? ` (${p.badgeNumber})` : ""}</option>)}
                     </select>
                     <input value={staffRole} onChange={(e) => setStaffRole(e.target.value)} placeholder="Role"
                       className="w-24 rounded border px-2 text-sm" />

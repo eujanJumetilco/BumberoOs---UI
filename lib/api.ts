@@ -33,6 +33,8 @@ export type Staff = {
   trainings: string[];
   certifications: string[];
   dateJoined: string | null;
+  /** Brigade ID: exactly 7 digits, unique. */
+  badgeNumber: string | null;
 };
 
 export type Item = {
@@ -55,6 +57,7 @@ export type StaffAssignment = {
   role: string | null;
   assignedAt: string;
   releasedAt: string | null;
+  badgeNumber: string | null;
 };
 
 export type ItemAssignment = {
@@ -83,6 +86,9 @@ export type Incident = {
   staff: StaffAssignment[];
   items: ItemAssignment[];
   alarmHistory: { alarmLevel: AlarmLevel; raisedAt: string }[];
+  arrivedAt: string | null;
+  commanderName: string | null;
+  commanderOrders: { instruction: string; issuedAt: string }[];
 };
 
 export type Account = {
@@ -177,8 +183,10 @@ export const api = {
   updateIncident: (
     id: number,
     b: Partial<Pick<Incident, "nature" | "alarmLevel" | "incidentType" | "location" | "reportedBy" |
-      "dateTimeReported" | "underControlAt" | "fireOutAt">>,
+      "dateTimeReported" | "underControlAt" | "fireOutAt" | "arrivedAt" | "commanderName">>,
   ) => request<Incident>("PATCH", `/incidents/${id}`, b),
+  addCommanderOrder: (id: number, instruction: string) =>
+    request<Incident>("POST", `/incidents/${id}/orders`, { instruction }),
   assignStaff: (id: number, staffId: number, role?: string) =>
     request<Incident>("PUT", `/incidents/${id}/staff/${staffId}${qs({ role })}`),
   releaseStaff: (id: number, staffId: number) =>

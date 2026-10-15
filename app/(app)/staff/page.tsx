@@ -13,11 +13,11 @@ type Filter = "All" | StaffAvailability;
 type Form = {
   name: string; role: string; contactNumber: string; address: string;
   employed: boolean; availability: "AVAILABLE" | "UNAVAILABLE";
-  trainings: string; certifications: string;
+  trainings: string; certifications: string; badgeNumber: string;
 };
 const emptyForm: Form = {
   name: "", role: "", contactNumber: "", address: "", employed: true,
-  availability: "UNAVAILABLE", trainings: "", certifications: "",
+  availability: "UNAVAILABLE", trainings: "", certifications: "", badgeNumber: "",
 };
 const toList = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
 
@@ -35,7 +35,7 @@ export default function StaffPage() {
   const visible = staff.filter(
     (p) =>
       (filter === "All" || p.availability === filter) &&
-      (p.name + p.role).toLowerCase().includes(query.toLowerCase())
+      (p.name + p.role + (p.badgeNumber ?? "")).toLowerCase().includes(query.toLowerCase())
   );
   const selected = staff.find((p) => p.id === selectedId) ?? staff[0];
   const count = (f: Filter) =>
@@ -64,6 +64,7 @@ export default function StaffPage() {
       employed: p.employed,
       availability: p.availability === "AVAILABLE" ? "AVAILABLE" : "UNAVAILABLE",
       trainings: p.trainings.join(", "), certifications: p.certifications.join(", "),
+      badgeNumber: p.badgeNumber ?? "",
     });
     setShowFile(false);
   };
@@ -71,6 +72,8 @@ export default function StaffPage() {
   const save = async () => {
     if (!form) return;
     if (!form.name.trim() || !form.role.trim()) { setError("Name and role are required."); return; }
+    const badge = form.badgeNumber.trim();
+    if (badge && !/^\d{7}$/.test(badge)) { setError("Staff ID must be exactly 7 digits."); return; }
     const editing = editingId !== null ? staff.find((p) => p.id === editingId) : undefined;
     const body = {
       name: form.name.trim(), role: form.role.trim(),
@@ -78,6 +81,8 @@ export default function StaffPage() {
       address: form.address.trim() || undefined,
       employed: form.employed,
       trainings: toList(form.trainings), certifications: toList(form.certifications),
+      // On edit, a blank ID clears it; on create, leave it out.
+      badgeNumber: editing ? badge : badge || undefined,
     };
     const ok = await run(async () => {
       if (editing) {
@@ -163,7 +168,7 @@ export default function StaffPage() {
 
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-gray-500">
-              <tr><th className="py-2">Member</th><th>Contact</th><th>Employed</th><th>Status</th></tr>
+              <tr><th className="py-2">Member</th><th>Staff ID</th><th>Contact</th><th>Employed</th><th>Status</th></tr>
             </thead>
             <tbody>
               {visible.map((p) => (
@@ -173,13 +178,14 @@ export default function StaffPage() {
                     <p className="font-medium">{p.name}</p>
                     <p className="text-xs text-gray-500">{p.role}</p>
                   </td>
+                  <td className="font-mono text-xs">{p.badgeNumber ?? "—"}</td>
                   <td>{p.contactNumber ?? "—"}</td>
                   <td>{p.employed ? "Yes" : "No"}</td>
                   <td><StatusBadge tone={tones[p.availability]}>{label(p.availability)}</StatusBadge></td>
                 </tr>
               ))}
               {visible.length === 0 && (
-                <tr><td colSpan={4} className="py-6 text-center text-gray-500">
+                <tr><td colSpan={5} className="py-6 text-center text-gray-500">
                   {loading ? "Loading..." : "No staff found."}
                 </td></tr>
               )}
@@ -217,6 +223,7 @@ export default function StaffPage() {
             </div>
 
             <dl className="mb-4 space-y-1 text-sm">
+              <div className="flex justify-between"><dt className="text-gray-500">Staff ID</dt><dd className="font-mono">{selected.badgeNumber ?? "—"}</dd></div>
               <div className="flex justify-between"><dt className="text-gray-500">Contact</dt><dd>{selected.contactNumber ?? "—"}</dd></div>
               <div className="flex justify-between"><dt className="text-gray-500">Address</dt><dd className="text-right">{selected.address ?? "—"}</dd></div>
               <div className="flex justify-between"><dt className="text-gray-500">Joined</dt><dd>{fmtDateTime(selected.dateJoined)}</dd></div>
@@ -240,6 +247,10 @@ export default function StaffPage() {
         <Modal title={editingId ? "Edit Staff Member" : "Add Staff Member"} onClose={() => setForm(null)}>
           <Field label="Full Name *">
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
+          </Field>
+          <Field label="Staff ID (7 digits)">
+            <input value={form.badgeNumber} inputMode="numeric" maxLength={7} placeholder="e.g. 2516528"
+              onChange={(e) => setForm({ ...form, badgeNumber: e.target.value.replace(/\D/g, "") })} className={inputCls} />
           </Field>
           <Field label="Role *">
             <input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}
@@ -293,6 +304,7 @@ export default function StaffPage() {
           </div>
           <div className="space-y-3 text-sm">
             {([
+              ["Staff ID", selected.badgeNumber ?? "—"],
               ["Contact", selected.contactNumber ?? "—"],
               ["Address", selected.address ?? "—"],
               ["Employed", selected.employed ? "Yes" : "No"],

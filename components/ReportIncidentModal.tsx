@@ -87,7 +87,7 @@ export default function ReportIncidentModal({
           <label key={p.id} className="flex items-center gap-2 py-0.5">
             <input type="checkbox" checked={staffIds.includes(p.id)}
               onChange={(e) => setStaffIds(e.target.checked ? [...staffIds, p.id] : staffIds.filter((x) => x !== p.id))} />
-            {p.name} <span className="text-xs text-gray-500">{p.role}</span>
+            {p.name} <span className="text-xs text-gray-500">{p.role}{p.badgeNumber ? ` · ID ${p.badgeNumber}` : ""}</span>
           </label>
         ))}
       </div>
