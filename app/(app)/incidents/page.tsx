@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import ErrorBanner from "@/components/ErrorBanner";
 import Modal, { inputCls } from "@/components/Modal";
+import dynamic from "next/dynamic";
 import CommandPanel from "@/components/CommandPanel";
 import ReportIncidentModal from "@/components/ReportIncidentModal";
 import StatusBadge from "@/components/StatusBadge";
@@ -9,7 +10,14 @@ import {
   ALARM_LEVELS, api, errMsg, fmtDateTime, fmtTime, label, nowUtc,
   type AlarmLevel, type Incident, type IncidentStatus, type Item, type ItemCondition, type Staff,
 } from "@/lib/api";
+import type { LatLng } from "@/lib/map";
 import { getSettings } from "@/lib/settings";
+
+// Leaflet touches `window`, so the map only loads in the browser.
+const LocationPicker = dynamic(() => import("@/components/LocationPicker"), {
+  ssr: false,
+  loading: () => <p className="mb-4 text-sm text-gray-500">Loading map...</p>,
+});
 
 type Filter = "ALL" | IncidentStatus;
 
@@ -23,6 +31,8 @@ export default function IncidentsPage() {
   const [busy, setBusy] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showResolve, setShowResolve] = useState(false);
+  const [showPin, setShowPin] = useState(false);
+  const [pinDraft, setPinDraft] = useState<LatLng | null>(null);
   const [returns, setReturns] = useState<Record<number, ItemCondition | "">>({});
   const [staffPick, setStaffPick] = useState("");
   const [staffRole, setStaffRole] = useState("");
@@ -141,6 +151,17 @@ export default function IncidentsPage() {
               <p className="text-sm text-gray-500">
                 Reported {fmtDateTime(selected.dateTimeReported)} by {selected.reportedBy}
                 {selected.resolvedAt && ` · Resolved ${fmtDateTime(selected.resolvedAt)}`}
+              </p>
+
+              <p className="mt-1 text-sm text-gray-500">
+                {selected.latitude != null ? "Pinned on the map." : "Not on the map yet."}{" "}
+                <button onClick={() => {
+                  setPinDraft(selected.latitude != null && selected.longitude != null
+                    ? { lat: selected.latitude, lng: selected.longitude } : null);
+                  setShowPin(true);
+                }} className="text-red-700 underline">
+                  {selected.latitude != null ? "Move pin" : "Set pin"}
+                </button>
               </p>
 
               <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
@@ -275,6 +296,22 @@ export default function IncidentsPage() {
       {showReport && (
         <ReportIncidentModal onClose={() => setShowReport(false)}
           onCreated={(i) => { setShowReport(false); setSelectedId(i.id); void refresh(); }} />
+      )}
+
+      {showPin && selected && (
+        <Modal title={`Map location for #${selected.id}`} onClose={() => setShowPin(false)}>
+          <LocationPicker value={pinDraft} onChange={setPinDraft} initialQuery={selected.location} />
+          <div className="mt-4 flex justify-end gap-2">
+            <button onClick={() => setShowPin(false)} className="rounded border px-4 py-2 text-sm">Cancel</button>
+            <button disabled={busy || !pinDraft}
+              onClick={async () => {
+                if (pinDraft && await act(() => api.updateIncident(selected.id, { latitude: pinDraft.lat, longitude: pinDraft.lng }))) {
+                  setShowPin(false);
+                }
+              }}
+              className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save Pin</button>
+          </div>
+        </Modal>
       )}
 
       {showResolve && selected && (

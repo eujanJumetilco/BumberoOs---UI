@@ -89,6 +89,9 @@ export type Incident = {
   arrivedAt: string | null;
   commanderName: string | null;
   commanderOrders: { instruction: string; issuedAt: string }[];
+  /** Map position; both or neither. */
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export type Account = {
@@ -108,6 +111,8 @@ export type NewIncident = {
   dateTimeReported?: string;
   staffIds?: number[];
   items?: { itemId: number; quantity: number }[];
+  latitude?: number;
+  longitude?: number;
 };
 
 export class ApiError extends Error {
@@ -183,7 +188,7 @@ export const api = {
   updateIncident: (
     id: number,
     b: Partial<Pick<Incident, "nature" | "alarmLevel" | "incidentType" | "location" | "reportedBy" |
-      "dateTimeReported" | "underControlAt" | "fireOutAt" | "arrivedAt" | "commanderName">>,
+      "dateTimeReported" | "underControlAt" | "fireOutAt" | "arrivedAt" | "commanderName" | "latitude" | "longitude">>,
   ) => request<Incident>("PATCH", `/incidents/${id}`, b),
   addCommanderOrder: (id: number, instruction: string) =>
     request<Incident>("POST", `/incidents/${id}/orders`, { instruction }),

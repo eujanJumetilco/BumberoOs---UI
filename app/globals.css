@@ -116,3 +116,8 @@ html[data-text="xl"] { font-size: 20px; }
   outline-offset: 2px;
 }
 [data-contrast="high"] .border { border-width: 2px; }
+
+/* ---------- Maps ---------- */
+/* Darken OpenStreetMap's light tiles in dark mode (markers and controls are unaffected). */
+[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9); }
+[data-theme="dark"] .leaflet-container { background: #0b111b; }

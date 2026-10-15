@@ -1,11 +1,19 @@
 "use client";
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import ErrorBanner from "./ErrorBanner";
 import Modal, { Field, inputCls } from "./Modal";
 import { useAccount } from "@/lib/auth";
+import type { LatLng } from "@/lib/map";
 import {
   ALARM_LEVELS, api, errMsg, label, type AlarmLevel, type Incident, type IncidentNature, type Item, type Staff,
 } from "@/lib/api";
+
+// Leaflet touches `window`, so the map only loads in the browser.
+const LocationPicker = dynamic(() => import("./LocationPicker"), {
+  ssr: false,
+  loading: () => <p className="mb-4 text-sm text-gray-500">Loading map...</p>,
+});
 
 const TYPES = ["Fire", "Structure Fire", "Vehicle Fire", "Medical Emergency", "Hazmat", "Rescue", "Standby", "Drill"];
 
@@ -17,6 +25,7 @@ export default function ReportIncidentModal({
   const [alarmLevel, setAlarmLevel] = useState<AlarmLevel | "">("FIRST_ALARM");
   const [incidentType, setIncidentType] = useState("");
   const [location, setLocation] = useState("");
+  const [pin, setPin] = useState<LatLng | null>(null);
   const [reportedBy, setReportedBy] = useState(account?.displayName ?? account?.email ?? "");
   const [staff, setStaff] = useState<Staff[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -42,6 +51,7 @@ export default function ReportIncidentModal({
         nature,
         alarmLevel: nature === "EMERGENCY" && alarmLevel ? alarmLevel : undefined,
         incidentType: incidentType.trim(), location: location.trim(), reportedBy: reportedBy.trim(),
+        latitude: pin?.lat, longitude: pin?.lng,
         staffIds: staffIds.length ? staffIds : undefined,
         items: Object.entries(qty).filter(([, q]) => q > 0).map(([id, q]) => ({ itemId: Number(id), quantity: q })),
       });
@@ -76,6 +86,10 @@ export default function ReportIncidentModal({
       <Field label="Location *">
         <input value={location} onChange={(e) => setLocation(e.target.value)} className={inputCls} />
       </Field>
+      <div className="mb-4">
+        <p className="mb-1 text-sm font-semibold">Map location (optional)</p>
+        <LocationPicker value={pin} onChange={setPin} initialQuery={location} />
+      </div>
       <Field label="Reported By *">
         <input value={reportedBy} onChange={(e) => setReportedBy(e.target.value)} className={inputCls} />
       </Field>

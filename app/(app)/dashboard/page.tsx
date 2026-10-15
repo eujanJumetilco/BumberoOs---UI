@@ -1,20 +1,31 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import IncidentMapPanel from "@/components/IncidentMapPanel";
 import ErrorBanner from "@/components/ErrorBanner";
 import ReportIncidentModal from "@/components/ReportIncidentModal";
 import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
 import { api, fmtDateTime, label, type Incident, type Item, type Staff } from "@/lib/api";
+import { hasPosition } from "@/lib/map";
 import { useLoad } from "@/lib/useLoad";
+
+// Leaflet touches `window`, so the map only loads in the browser.
+const IncidentMap = dynamic(() => import("@/components/IncidentMap"), {
+  ssr: false,
+  loading: () => <div className="flex h-96 items-center justify-center text-sm text-gray-500">Loading map...</div>,
+});
 
 const availTones = { AVAILABLE: "green", PARTIALLY_DISPATCHED: "amber", DISPATCHED: "red", UNAVAILABLE: "gray" } as const;
 
 export default function DashboardPage() {
   const router = useRouter();
   const [showReport, setShowReport] = useState(false);
+  const [mapSelectedId, setMapSelectedId] = useState<number | null>(null);
+  const [showResolved, setShowResolved] = useState(false);
 
   const { data, error, reload } = useLoad(
     async () => {
@@ -44,6 +55,9 @@ export default function DashboardPage() {
   const sorted = [...incidents].sort((a, b) => b.dateTimeReported.localeCompare(a.dateTimeReported));
   const ongoing = sorted.filter((i) => i.status === "ONGOING");
   const active = ongoing[0];
+  const placed = incidents.filter(hasPosition).filter((i) => showResolved || i.status === "ONGOING");
+  const unplaced = ongoing.filter((i) => !hasPosition(i));
+  const mapSelected = incidents.find((i) => i.id === mapSelectedId) ?? null;
   const vehicles = items.filter((i) => i.category === "ENGINE" || i.category === "AMBULANCE");
 
   return (
@@ -80,6 +94,44 @@ export default function DashboardPage() {
           </p>
           <p className="mt-1 text-xs text-gray-500">{incidents.length - ongoing.length} resolved in total</p>
         </StatCard>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="rounded-lg border bg-white p-5 lg:col-span-2">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-bold">Incident Map</h2>
+            <label className="flex items-center gap-2 text-sm text-gray-600">
+              <input type="checkbox" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} />
+              Show resolved
+            </label>
+          </div>
+          <IncidentMap incidents={placed} selectedId={mapSelectedId} onSelect={setMapSelectedId} />
+          <p className="mt-2 text-xs text-gray-500">
+            {placed.length === 0
+              ? "No incidents with a map location. Pin one when reporting, or from Incident Management."
+              : "Click a red circle to see what is deployed there."}
+          </p>
+          {unplaced.length > 0 && (
+            <p className="mt-1 text-xs text-gray-500">
+              Not on the map (no location pinned):{" "}
+              {unplaced.map((i, n) => (
+                <span key={i.id}>
+                  {n > 0 && ", "}
+                  <button onClick={() => setMapSelectedId(i.id)} className="text-red-700 underline">
+                    INC-{i.id} {i.incidentType}
+                  </button>
+                </span>
+              ))}
+            </p>
+          )}
+        </div>
+        <div className="self-start">
+          {mapSelected ? <IncidentMapPanel incident={mapSelected} /> : (
+            <div className="rounded-lg border bg-white p-5 text-sm text-gray-500">
+              Select an incident on the map to see who and what is deployed.
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
