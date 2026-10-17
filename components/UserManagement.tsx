@@ -3,9 +3,9 @@ import { useState } from "react";
 import ErrorBanner from "./ErrorBanner";
 import Modal, { Field, inputCls } from "./Modal";
 import StatusBadge from "./StatusBadge";
-import { api, errMsg, fmtDateTime, label, type Account, type Staff, type UserRole } from "@/lib/api";
+import { api, errMsg, fmtDateTime, label, type UserRole } from "@/lib/api";
 import { useAccount } from "@/lib/auth";
-import { useLoad } from "@/lib/useLoad";
+import { invalidate, useResource } from "@/lib/store";
 
 type Form = { email: string; password: string; displayName: string; role: UserRole };
 const emptyForm: Form = { email: "", password: "", displayName: "", role: "DISPATCHER" };
@@ -13,8 +13,8 @@ const emptyForm: Form = { email: "", password: "", displayName: "", role: "DISPA
 /** Admin-only account management. The server enforces the same rules; this is the interface to them. */
 export default function UserManagement() {
   const me = useAccount();
-  const { data: accounts, error: loadError, loading, reload } = useLoad(() => api.listAccounts(), [] as Account[]);
-  const { data: staff } = useLoad(() => api.listStaff(), [] as Staff[]);
+  const { data: accounts, error: loadError, loading } = useResource("accounts");
+  const { data: staff } = useResource("staff");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<Form | null>(null);
@@ -22,7 +22,7 @@ export default function UserManagement() {
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
-    try { await fn(); await reload(); return true; }
+    try { await fn(); await invalidate(); return true; }
     catch (e) { setError(errMsg(e)); return false; }
     finally { setBusy(false); }
   };

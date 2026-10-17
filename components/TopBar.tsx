@@ -1,11 +1,11 @@
 "use client";
 import { useAccount } from "@/lib/auth";
-import { api } from "@/lib/api";
-import { useLoad } from "@/lib/useLoad";
+import { useResource } from "@/lib/store";
 
 export default function TopBar() {
   const account = useAccount();
-  const { data: ongoing, error } = useLoad(() => api.listIncidents({ status: "ONGOING" }), []);
+  const { data: incidents, error } = useResource("incidents");
+  const ongoing = incidents.filter((i) => i.status === "ONGOING");
   const online = !error;
 
   return (

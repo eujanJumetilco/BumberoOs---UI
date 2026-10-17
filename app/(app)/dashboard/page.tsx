@@ -9,9 +9,9 @@ import ErrorBanner from "@/components/ErrorBanner";
 import ReportIncidentModal from "@/components/ReportIncidentModal";
 import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
-import { api, fmtDateTime, label, type Incident, type InventoryAlert, type Item, type Staff } from "@/lib/api";
+import { fmtDateTime, label, type Staff } from "@/lib/api";
 import { hasPosition } from "@/lib/map";
-import { useLoad } from "@/lib/useLoad";
+import { invalidate, useResource } from "@/lib/store";
 
 // Leaflet touches `window`, so the map only loads in the browser.
 const IncidentMap = dynamic(() => import("@/components/IncidentMap"), {
@@ -27,16 +27,12 @@ export default function DashboardPage() {
   const [mapSelectedId, setMapSelectedId] = useState<number | null>(null);
   const [showResolved, setShowResolved] = useState(false);
 
-  const { data, error, reload } = useLoad(
-    async () => {
-      const [staff, items, incidents, alerts] = await Promise.all([
-        api.listStaff(), api.listItems(), api.listIncidents(), api.listAlerts(),
-      ]);
-      return { staff, items, incidents, alerts };
-    },
-    { staff: [] as Staff[], items: [] as Item[], incidents: [] as Incident[], alerts: [] as InventoryAlert[] },
-  );
-  const { staff, items, incidents, alerts } = data;
+  const staffRes = useResource("staff");
+  const itemsRes = useResource("items");
+  const incidentsRes = useResource("incidents");
+  const alertsRes = useResource("alerts");
+  const staff = staffRes.data, items = itemsRes.data, incidents = incidentsRes.data, alerts = alertsRes.data;
+  const error = staffRes.error ?? itemsRes.error ?? incidentsRes.error ?? alertsRes.error;
 
   // Sidebar "Quick Dispatch" links here with ?report=1
   useEffect(() => {
@@ -231,7 +227,7 @@ export default function DashboardPage() {
 
       {showReport && (
         <ReportIncidentModal onClose={() => setShowReport(false)}
-          onCreated={() => { setShowReport(false); void reload(); }} />
+          onCreated={() => { setShowReport(false); void invalidate(); }} />
       )}
     </div>
   );

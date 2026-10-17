@@ -5,7 +5,7 @@ import Modal, { Field, inputCls } from "@/components/Modal";
 import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
 import { api, errMsg, fmtDateTime, label, type Staff, type StaffAvailability } from "@/lib/api";
-import { useLoad } from "@/lib/useLoad";
+import { invalidate, useResource } from "@/lib/store";
 
 const tones = { AVAILABLE: "green", DISPATCHED: "amber", UNAVAILABLE: "gray" } as const;
 type Filter = "All" | StaffAvailability;
@@ -22,7 +22,7 @@ const emptyForm: Form = {
 const toList = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
 
 export default function StaffPage() {
-  const { data: staff, error: loadError, loading, reload } = useLoad(() => api.listStaff(), [] as Staff[]);
+  const { data: staff, error: loadError, loading } = useResource("staff");
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("All");
   const [query, setQuery] = useState("");
@@ -46,7 +46,7 @@ export default function StaffPage() {
     setError(null);
     try {
       await fn();
-      await reload();
+      await invalidate();
       return true;
     } catch (e) {
       setError(errMsg(e));

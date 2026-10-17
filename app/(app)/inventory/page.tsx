@@ -8,7 +8,7 @@ import {
   api, errMsg, fmtDate, ITEM_CATEGORIES, label, todayManila,
   type InventoryAlert, type Item, type ItemCategory, type ItemCondition,
 } from "@/lib/api";
-import { useLoad } from "@/lib/useLoad";
+import { invalidate, useResource } from "@/lib/store";
 
 const condTones = { GOOD: "green", DAMAGED: "amber", RETIRED: "gray" } as const;
 const availTones = { AVAILABLE: "green", PARTIALLY_DISPATCHED: "amber", DISPATCHED: "red", UNAVAILABLE: "gray" } as const;
@@ -26,8 +26,8 @@ type Form = {
 const emptyForm: Form = { name: "", description: "", serialNumber: "", category: "OTHER", condition: "GOOD", quantity: "1", lastMaintained: "", expiryDate: "" };
 
 export default function InventoryPage() {
-  const { data: items, error: loadError, loading, reload } = useLoad(() => api.listItems(), [] as Item[]);
-  const { data: alerts, reload: reloadAlerts } = useLoad(() => api.listAlerts(), [] as InventoryAlert[]);
+  const { data: items, error: loadError, loading } = useResource("items");
+  const { data: alerts } = useResource("alerts");
   const [error, setError] = useState<string | null>(null);
   const [alertsOnly, setAlertsOnly] = useState(false);
   const [filter, setFilter] = useState<Filter>("All");
@@ -53,7 +53,7 @@ export default function InventoryPage() {
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
-    try { await fn(); await Promise.all([reload(), reloadAlerts()]); return true; }
+    try { await fn(); await invalidate(); return true; }
     catch (e) { setError(errMsg(e)); return false; }
     finally { setBusy(false); }
   };

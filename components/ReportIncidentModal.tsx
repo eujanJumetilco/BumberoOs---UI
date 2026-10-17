@@ -1,12 +1,13 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import ErrorBanner from "./ErrorBanner";
 import Modal, { Field, inputCls } from "./Modal";
 import { useAccount } from "@/lib/auth";
 import type { LatLng } from "@/lib/map";
+import { useResource } from "@/lib/store";
 import {
-  ALARM_LEVELS, api, errMsg, label, type AlarmLevel, type Incident, type IncidentNature, type Item, type Staff,
+  ALARM_LEVELS, api, errMsg, label, type AlarmLevel, type Incident, type IncidentNature,
 } from "@/lib/api";
 
 // Leaflet touches `window`, so the map only loads in the browser.
@@ -27,17 +28,14 @@ export default function ReportIncidentModal({
   const [location, setLocation] = useState("");
   const [pin, setPin] = useState<LatLng | null>(null);
   const [reportedBy, setReportedBy] = useState(account?.displayName ?? account?.email ?? "");
-  const [staff, setStaff] = useState<Staff[]>([]);
-  const [items, setItems] = useState<Item[]>([]);
+  const staffRes = useResource("availableStaff");
+  const itemsRes = useResource("availableItems");
+  const items = itemsRes.data;
+  const staff = staffRes.data.filter((p) => p.employed);
   const [staffIds, setStaffIds] = useState<number[]>([]);
   const [qty, setQty] = useState<Record<number, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    api.listStaff("AVAILABLE").then((s) => setStaff(s.filter((p) => p.employed))).catch((e) => setError(errMsg(e)));
-    api.listItems({ availableOnly: true }).then(setItems).catch((e) => setError(errMsg(e)));
-  }, []);
 
   const submit = async () => {
     if (!incidentType.trim() || !location.trim() || !reportedBy.trim()) {
@@ -119,7 +117,7 @@ export default function ReportIncidentModal({
         ))}
       </div>
 
-      <ErrorBanner message={error} />
+      <ErrorBanner message={error ?? staffRes.error ?? itemsRes.error} />
       <div className="mt-4 flex justify-end gap-2">
         <button onClick={onClose} className="rounded border px-4 py-2 text-sm">Cancel</button>
         <button onClick={submit} disabled={busy}

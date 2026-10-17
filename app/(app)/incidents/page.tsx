@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import ErrorBanner from "@/components/ErrorBanner";
 import Modal, { inputCls } from "@/components/Modal";
 import dynamic from "next/dynamic";
@@ -8,10 +8,11 @@ import ReportIncidentModal from "@/components/ReportIncidentModal";
 import StatusBadge from "@/components/StatusBadge";
 import {
   ALARM_LEVELS, api, errMsg, fmtDateTime, fmtTime, label, nowUtc,
-  type AlarmLevel, type Incident, type IncidentStatus, type Item, type ItemCondition, type Staff,
+  type AlarmLevel, type IncidentStatus, type ItemCondition,
 } from "@/lib/api";
 import type { LatLng } from "@/lib/map";
 import { getSettings } from "@/lib/settings";
+import { invalidate, useResource } from "@/lib/store";
 
 // Leaflet touches `window`, so the map only loads in the browser.
 const LocationPicker = dynamic(() => import("@/components/LocationPicker"), {
@@ -22,11 +23,8 @@ const LocationPicker = dynamic(() => import("@/components/LocationPicker"), {
 type Filter = "ALL" | IncidentStatus;
 
 export default function IncidentsPage() {
-  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [filter, setFilter] = useState<Filter>(() => getSettings().incidentsFilter);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [availStaff, setAvailStaff] = useState<Staff[]>([]);
-  const [availItems, setAvailItems] = useState<Item[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -39,22 +37,13 @@ export default function IncidentsPage() {
   const [itemPick, setItemPick] = useState("");
   const [itemQty, setItemQty] = useState(1);
 
-  // Refresh the list plus whatever is free to dispatch (changes after every action).
-  const refresh = async () => {
-    try {
-      const [inc, s, i] = await Promise.all([
-        api.listIncidents(), api.listStaff("AVAILABLE"), api.listItems({ availableOnly: true }),
-      ]);
-      setIncidents(inc);
-      setAvailStaff(s.filter((p) => p.employed));
-      setAvailItems(i);
-      setError(null);
-    } catch (e) {
-      setError(errMsg(e));
-    }
-  };
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void refresh(); }, []);
+  // The list plus whatever is free to dispatch (refetched after every action).
+  const incidentsRes = useResource("incidents");
+  const staffRes = useResource("availableStaff");
+  const itemsRes = useResource("availableItems");
+  const incidents = incidentsRes.data, availItems = itemsRes.data;
+  const availStaff = staffRes.data.filter((p) => p.employed);
+  const loadError = incidentsRes.error ?? staffRes.error ?? itemsRes.error;
 
   const visible = incidents
     .filter((i) => filter === "ALL" || i.status === filter)
@@ -66,7 +55,7 @@ export default function IncidentsPage() {
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
-    try { await fn(); await refresh(); return true; }
+    try { await fn(); await invalidate(); return true; }
     catch (e) { setError(errMsg(e)); return false; }
     finally { setBusy(false); }
   };
@@ -107,7 +96,7 @@ export default function IncidentsPage() {
           className="ml-auto rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white">+ Report Incident</button>
       </div>
 
-      <ErrorBanner message={error} onDismiss={() => setError(null)} />
+      <ErrorBanner message={error ?? loadError} onDismiss={() => setError(null)} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* List */}
@@ -295,7 +284,7 @@ export default function IncidentsPage() {
 
       {showReport && (
         <ReportIncidentModal onClose={() => setShowReport(false)}
-          onCreated={(i) => { setShowReport(false); setSelectedId(i.id); void refresh(); }} />
+          onCreated={(i) => { setShowReport(false); setSelectedId(i.id); void invalidate(); }} />
       )}
 
       {showPin && selected && (

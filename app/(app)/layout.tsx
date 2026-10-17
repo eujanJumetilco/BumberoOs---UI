@@ -6,6 +6,7 @@ import TopBar from "@/components/TopBar";
 import { api } from "@/lib/api";
 import { setAccount, useAccount } from "@/lib/auth";
 import { useSettings } from "@/lib/settings";
+import { clearData } from "@/lib/store";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const account = useAccount();
@@ -13,7 +14,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { timeFormat } = useSettings();
 
   useEffect(() => {
-    if (account === null) router.replace("/");
+    if (account !== null) return;
+    clearData(); // signed out: the next account must not see this one's cached data
+    router.replace("/");
   }, [account, router]);
 
   // The cached account may be stale (expired session, role changed): confirm it with the server.
