@@ -52,7 +52,8 @@ export default function Home() {
     <main className="flex min-h-screen items-center justify-center bg-gray-100 p-6">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
         <div className="mb-8 text-center">
-          <Image src="/Logo-login-V2.png" alt="BumberoOS Logo" width={220} height={143} className="mx-auto" />
+          <Image src="/Logo-login-V2.png" alt="BumberoOS Logo" width={220} height={143} className="logo-light mx-auto" />
+          <Image src="/Logo-Home-V2-dark.png" alt="BumberoOS Logo" width={220} height={86} className="logo-dark mx-auto" />
           <p className="mt-2 text-sm text-gray-500">
             Volunteer Firefighting Brigade Management System
           </p>

@@ -73,6 +73,10 @@ html[data-text="xl"] { font-size: 20px; }
 [data-theme="dark"] .border-red-200,
 [data-theme="dark"] .border-red-300 { border-color: #7f2a2e; }
 
+/* Logos with a dark variant render both images; the theme hides the other one. */
+:root:not([data-theme="dark"]) .logo-dark,
+[data-theme="dark"] .logo-light { display: none; }
+
 /* Bare `border` classes resolve to currentColor, which is harsh on a dark surface. */
 @layer base {
   :root[data-theme="dark"] * { border-color: var(--color-gray-200); }

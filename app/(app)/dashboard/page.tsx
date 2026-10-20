@@ -63,7 +63,7 @@ export default function DashboardPage() {
       <div className="flex items-start justify-between rounded-lg border bg-white p-5">
         <div>
           <p className="text-xs font-semibold uppercase text-red-700">Station Briefing</p>
-          <h1 className="text-2xl font-bold">BumberoOS Command</h1>
+          <h1 className="text-2xl font-bold">BumberoOS Command</h1> 
           <p className="mt-1 max-w-xl text-sm text-gray-600">
             {staff.length} personnel rostered, {count("AVAILABLE")} available to dispatch.
             {" "}{vehicles.length} apparatus tracked.

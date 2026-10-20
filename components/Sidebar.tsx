@@ -19,14 +19,24 @@ export default function Sidebar() {
   return (
     <aside className="flex w-56 flex-col border-r bg-white p-4">
       <Link href="/dashboard" className="mb-4 block">
+        {/* Both stay lazy (no preload) so only the visible one is fetched. */}
         <Image
           src="/Logo-Home-V2.png"
           alt="BumberoOS Logo"
           width={200}
           height={80}
-          className="mx-auto"
+          className="logo-light mx-auto"
           style={{ width: "100%", height: "auto" }}
-          priority
+          fetchPriority="high"
+        />
+        <Image
+          src="/Logo-Home-V2-dark.png"
+          alt="BumberoOS Logo"
+          width={200}
+          height={80}
+          className="logo-dark mx-auto"
+          style={{ width: "100%", height: "auto" }}
+          fetchPriority="high"
         />
       </Link>
       
