@@ -3,6 +3,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --surface: #ffffff;
 }
 
 @theme inline {
@@ -12,15 +13,115 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ---------- Text size: Tailwind sizes are rem-based, so the root size scales everything ---------- */
+html[data-text="sm"] { font-size: 14px; }
+html[data-text="md"] { font-size: 16px; }
+html[data-text="lg"] { font-size: 18px; }
+html[data-text="xl"] { font-size: 20px; }
+
+/* ---------- Density: every Tailwind spacing utility is a multiple of --spacing ---------- */
+:root[data-density="compact"] { --spacing: 0.2rem; }
+
+/*
+ * ---------- Dark mode ----------
+ * Components use hardcoded Tailwind palette classes, so instead of adding dark: variants to every
+ * file we remap the palette variables here. These rules are unlayered, so they beat the utilities.
+ * bg-white / text-white are left alone on purpose: text-white sits on red buttons.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0b111b;
+  --foreground: #e8ecf2;
+  --surface: #182030;
+
+  --color-gray-50: #0f1520;
+  --color-gray-100: #1e2736;
+  --color-gray-200: #2d3748;
+  --color-gray-300: #3f4b5f;
+  --color-gray-400: #6b7788;
+  --color-gray-500: #98a2b3;
+  --color-gray-600: #b0b8c5;
+  --color-gray-700: #d0d5dd;
+  --color-gray-800: #e4e7ec;
+  --color-gray-900: #f2f4f7;
+}
+
+[data-theme="dark"] .bg-white { background-color: var(--surface); }
+
+[data-theme="dark"] .bg-red-50 { background-color: #3a1618; }
+[data-theme="dark"] .bg-red-100 { background-color: #4a1c1f; }
+[data-theme="dark"] .bg-red-200 { background-color: #6b2226; }
+[data-theme="dark"] .bg-green-100 { background-color: #123524; }
+[data-theme="dark"] .bg-amber-50 { background-color: #3a2c10; }
+[data-theme="dark"] .bg-amber-100 { background-color: #4a3912; }
+
+[data-theme="dark"] .text-red-600,
+[data-theme="dark"] .text-red-700,
+[data-theme="dark"] .text-red-800 { color: #fca5a5; }
+[data-theme="dark"] .text-green-700,
+[data-theme="dark"] .text-green-800 { color: #86efac; }
+[data-theme="dark"] .text-amber-600,
+[data-theme="dark"] .text-amber-700,
+[data-theme="dark"] .text-amber-800 { color: #fcd34d; }
+
+[data-theme="dark"] .border-red-200,
+[data-theme="dark"] .border-red-300 { border-color: #7f2a2e; }
+
+/* Logos with a dark variant render both images; the theme hides the other one. */
+:root:not([data-theme="dark"]) .logo-dark,
+[data-theme="dark"] .logo-light { display: none; }
+
+/* Bare `border` classes resolve to currentColor, which is harsh on a dark surface. */
+@layer base {
+  :root[data-theme="dark"] * { border-color: var(--color-gray-200); }
+}
+
+/*
+ * ---------- High contrast ----------
+ * Pushes text and borders to the extremes and thickens focus rings. Works with either theme.
+ */
+:root[data-contrast="high"][data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #000000;
+  --color-gray-400: #374151;
+  --color-gray-500: #1f2937;
+  --color-gray-600: #111827;
+  --color-gray-700: #000000;
+}
+:root[data-contrast="high"][data-theme="dark"] {
+  --background: #000000;
+  --foreground: #ffffff;
+  --surface: #0a0a0a;
+  --color-gray-50: #050505;
+  --color-gray-100: #111111;
+  --color-gray-200: #6b7280;
+  --color-gray-400: #d1d5db;
+  --color-gray-500: #e5e7eb;
+  --color-gray-600: #f3f4f6;
+  --color-gray-700: #ffffff;
+}
+[data-contrast="high"] button,
+[data-contrast="high"] a,
+[data-contrast="high"] input,
+[data-contrast="high"] select,
+[data-contrast="high"] textarea { outline-width: 0; }
+[data-contrast="high"] button:focus-visible,
+[data-contrast="high"] a:focus-visible,
+[data-contrast="high"] input:focus-visible,
+[data-contrast="high"] select:focus-visible,
+[data-contrast="high"] textarea:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 2px;
+}
+[data-contrast="high"] .border { border-width: 2px; }
+
+/* ---------- Maps ---------- */
+/* Darken OpenStreetMap's light tiles in dark mode (markers and controls are unaffected). */
+[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9); }
+[data-theme="dark"] .leaflet-container { background: #0b111b; }
