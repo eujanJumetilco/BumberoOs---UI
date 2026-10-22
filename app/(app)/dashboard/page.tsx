@@ -9,6 +9,7 @@ import ErrorBanner from "@/components/ErrorBanner";
 import ReportIncidentModal from "@/components/ReportIncidentModal";
 import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
+import CreateEventButton from "@/components/CreateEventButton";
 import { fmtDateTime, label, type Staff } from "@/lib/api";
 import { hasPosition } from "@/lib/map";
 import { invalidate, useResource } from "@/lib/store";
@@ -63,14 +64,17 @@ export default function DashboardPage() {
       <div className="flex items-start justify-between rounded-lg border bg-white p-5">
         <div>
           <p className="text-xs font-semibold uppercase text-red-700">Station Briefing</p>
-          <h1 className="text-2xl font-bold">BumberoOS Command</h1> 
+          <h1 className="text-2xl font-bold">BumberoOS Command</h1>
           <p className="mt-1 max-w-xl text-sm text-gray-600">
             {staff.length} personnel rostered, {count("AVAILABLE")} available to dispatch.
             {" "}{vehicles.length} apparatus tracked.
           </p>
         </div>
-        <button onClick={() => setShowReport(true)}
-          className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white">+ Report Incident</button>
+        <div className="flex gap-2">
+          <CreateEventButton />
+          <button onClick={() => setShowReport(true)}
+            className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white">+ Report Incident</button>
+        </div>
       </div>
 
       <ErrorBanner message={error} />
@@ -190,38 +194,38 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-6 self-start">
-        <div className="rounded-lg border bg-white p-5">
-          <div className="mb-3 flex justify-between">
-            <h2 className="font-bold">Equipment Alerts{alerts.length > 0 && ` (${alerts.length})`}</h2>
-            <Link href="/inventory" className="text-sm text-red-700">Inventory</Link>
+          <div className="rounded-lg border bg-white p-5">
+            <div className="mb-3 flex justify-between">
+              <h2 className="font-bold">Equipment Alerts{alerts.length > 0 && ` (${alerts.length})`}</h2>
+              <Link href="/inventory" className="text-sm text-red-700">Inventory</Link>
+            </div>
+            <ul className="space-y-2 text-sm">
+              {alerts.slice(0, 6).map((a, n) => (
+                <li key={n} className="flex items-start gap-2">
+                  <StatusBadge tone={a.severity === "HIGH" ? "red" : "amber"}>{a.severity === "HIGH" ? "Urgent" : "Soon"}</StatusBadge>
+                  <span>{a.message}</span>
+                </li>
+              ))}
+              {alerts.length > 6 && <li className="text-xs text-gray-500">and {alerts.length - 6} more in Inventory.</li>}
+              {alerts.length === 0 && <li className="text-gray-500">Nothing needs attention.</li>}
+            </ul>
           </div>
-          <ul className="space-y-2 text-sm">
-            {alerts.slice(0, 6).map((a, n) => (
-              <li key={n} className="flex items-start gap-2">
-                <StatusBadge tone={a.severity === "HIGH" ? "red" : "amber"}>{a.severity === "HIGH" ? "Urgent" : "Soon"}</StatusBadge>
-                <span>{a.message}</span>
-              </li>
-            ))}
-            {alerts.length > 6 && <li className="text-xs text-gray-500">and {alerts.length - 6} more in Inventory.</li>}
-            {alerts.length === 0 && <li className="text-gray-500">Nothing needs attention.</li>}
-          </ul>
-        </div>
 
-        <div className="rounded-lg border bg-white p-5">
-          <h2 className="mb-3 font-bold">Apparatus Bay Status</h2>
-          <ul className="space-y-3">
-            {vehicles.map((v) => (
-              <li key={v.id} className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold">{v.name}</p>
-                  <p className="text-xs text-gray-500">{label(v.category)} · {v.serialNumber ?? "no serial"}</p>
-                </div>
-                <StatusBadge tone={availTones[v.availability]}>{label(v.availability)}</StatusBadge>
-              </li>
-            ))}
-            {vehicles.length === 0 && <li className="text-sm text-gray-500">No engines or ambulances tracked.</li>}
-          </ul>
-        </div>
+          <div className="rounded-lg border bg-white p-5">
+            <h2 className="mb-3 font-bold">Apparatus Bay Status</h2>
+            <ul className="space-y-3">
+              {vehicles.map((v) => (
+                <li key={v.id} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">{v.name}</p>
+                    <p className="text-xs text-gray-500">{label(v.category)} · {v.serialNumber ?? "no serial"}</p>
+                  </div>
+                  <StatusBadge tone={availTones[v.availability]}>{label(v.availability)}</StatusBadge>
+                </li>
+              ))}
+              {vehicles.length === 0 && <li className="text-sm text-gray-500">No engines or ambulances tracked.</li>}
+            </ul>
+          </div>
         </div>
       </div>
 

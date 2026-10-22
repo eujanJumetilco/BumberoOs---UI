@@ -4,6 +4,7 @@ import ErrorBanner from "@/components/ErrorBanner";
 import Modal, { inputCls } from "@/components/Modal";
 import dynamic from "next/dynamic";
 import CommandPanel from "@/components/CommandPanel";
+import CreateEventButton from "@/components/CreateEventButton";
 import ReportIncidentModal from "@/components/ReportIncidentModal";
 import StatusBadge from "@/components/StatusBadge";
 import {
@@ -92,8 +93,11 @@ export default function IncidentsPage() {
           <p className="text-xs uppercase text-gray-500">Resolved</p>
           <p className="font-bold">{incidents.length - ongoing.length} Resolved</p>
         </div>
-        <button onClick={() => setShowReport(true)}
-          className="ml-auto rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white">+ Report Incident</button>
+        <div className="ml-auto flex gap-2">
+          <CreateEventButton />
+          <button onClick={() => setShowReport(true)}
+            className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white">+ Report Incident</button>
+        </div>
       </div>
 
       <ErrorBanner message={error ?? loadError} onDismiss={() => setError(null)} />

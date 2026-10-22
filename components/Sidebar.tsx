@@ -10,6 +10,7 @@ const links = [
   { href: "/staff", label: "Staff" },
   { href: "/inventory", label: "Inventory" },
   { href: "/incidents", label: "Incidents" },
+  { href: "/events", label: "Events" }, // <-- BAGONG LINYA
   { href: "/settings", label: "Settings" },
 ];
 
@@ -40,8 +41,7 @@ export default function Sidebar() {
         />
       </Link>
       
-
-<button onClick={() => router.push("/dashboard?report=1")} className="mb-6 rounded bg-red-700 py-2 text-sm font-semibold text-white">
+      <button onClick={() => router.push("/dashboard?report=1")} className="mb-6 rounded bg-red-700 py-2 text-sm font-semibold text-white">
         Quick Dispatch
       </button>
       <nav className="flex flex-1 flex-col gap-1">
