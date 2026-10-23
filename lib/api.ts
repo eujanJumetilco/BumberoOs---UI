@@ -216,6 +216,8 @@ export const api = {
     request<Staff>("POST", "/staff", b),
   updateStaff: (id: number, b: Partial<Omit<Staff, "id" | "dateJoined">>) =>
     request<Staff>("PATCH", `/staff/${id}`, b),
+  /** Soft-remove: sets employed = false and availability = UNAVAILABLE. History is kept. */
+  retireStaff: (id: number) => request<Staff>("PATCH", `/staff/${id}/retire`),
   deleteStaff: (id: number) => request<void>("DELETE", `/staff/${id}`),
 
   // Items

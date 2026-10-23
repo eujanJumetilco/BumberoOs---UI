@@ -125,3 +125,18 @@ html[data-text="xl"] { font-size: 20px; }
 /* Darken OpenStreetMap's light tiles in dark mode (markers and controls are unaffected). */
 [data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9); }
 [data-theme="dark"] .leaflet-container { background: #0b111b; }
+
+/* ---------- Dropdown Fix for Dark Mode ---------- */
+select option {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+[data-theme="dark"] select option {
+  background-color: #182030; /* var(--surface) */
+  color: #e8ecf2; /* var(--foreground) */
+}
+
+[data-theme="dark"] select {
+  color-scheme: dark;
+}

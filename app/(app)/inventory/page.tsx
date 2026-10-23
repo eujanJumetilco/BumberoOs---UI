@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import ErrorBanner from "@/components/ErrorBanner";
+import FileIOButtons from "@/components/FileIOButtons";
 import Modal, { Field, inputCls } from "@/components/Modal";
 import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
@@ -95,17 +96,6 @@ export default function InventoryPage() {
     await run(() => api.deleteItem(i.id));
   };
 
-  const exportCsv = () => {
-    const rows = [["Name", "Category", "Serial", "Condition", "Quantity", "Dispatched", "Available", "Last maintained", "Expiry"],
-      ...visible.map((i) => [i.name, i.category, i.serialNumber ?? "", i.condition, i.quantity, i.quantityDispatched, i.quantityAvailable, i.lastMaintained ?? "", i.expiryDate ?? ""])];
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    a.download = "inventory.csv";
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-
   const filters: { key: Filter; label: string }[] = [
     { key: "All", label: "All Equipment" },
     { key: "GOOD", label: "Good Condition" },
@@ -120,8 +110,8 @@ export default function InventoryPage() {
           <h1 className="text-2xl font-bold">Apparatus & Tactical Equipment Inventory</h1>
           <p className="text-sm text-gray-600">Stock levels, condition and live dispatch status for brigade assets.</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={exportCsv} className="rounded border bg-white px-4 py-2 text-sm">Export CSV</button>
+        <div className="flex items-start gap-2">
+          <FileIOButtons path="items" filename="inventory" onImported={() => invalidate()} onError={setError} />
           <button onClick={() => { setEditingId(null); setForm(emptyForm); }}
             className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white">
             + Add Equipment / Asset

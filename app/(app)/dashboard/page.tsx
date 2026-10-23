@@ -14,7 +14,6 @@ import { fmtDateTime, label, type Staff } from "@/lib/api";
 import { hasPosition } from "@/lib/map";
 import { invalidate, useResource } from "@/lib/store";
 
-// Leaflet touches `window`, so the map only loads in the browser.
 const IncidentMap = dynamic(() => import("@/components/IncidentMap"), {
   ssr: false,
   loading: () => <div className="flex h-96 items-center justify-center text-sm text-gray-500">Loading map...</div>,
@@ -35,13 +34,18 @@ export default function DashboardPage() {
   const staff = staffRes.data, items = itemsRes.data, incidents = incidentsRes.data, alerts = alertsRes.data;
   const error = staffRes.error ?? itemsRes.error ?? incidentsRes.error ?? alertsRes.error;
 
-  // Sidebar "Quick Dispatch" links here with ?report=1
   useEffect(() => {
+    // Para sa ?report=1 URL
     if (new URLSearchParams(window.location.search).get("report")) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowReport(true);
       router.replace("/dashboard");
     }
+
+    // Para sa Quick Dispatch button mula sa Sidebar
+    const handleOpenModal = () => setShowReport(true);
+    window.addEventListener("openReportModal", handleOpenModal);
+    
+    return () => window.removeEventListener("openReportModal", handleOpenModal);
   }, [router]);
 
   const count = (a: Staff["availability"]) => staff.filter((p) => p.availability === a).length;

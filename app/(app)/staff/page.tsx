@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import ErrorBanner from "@/components/ErrorBanner";
+import FileIOButtons from "@/components/FileIOButtons";
 import Modal, { Field, inputCls } from "@/components/Modal";
 import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
@@ -108,6 +109,12 @@ export default function StaffPage() {
     if (ok) { setShowFile(false); setSelectedId(null); }
   };
 
+  const retire = async (p: Staff) => {
+    if (!confirm(`Retire ${p.name}? They will be marked not employed and unavailable. Their record and assignment history are kept.`)) return;
+    const ok = await run(() => api.retireStaff(p.id));
+    if (ok) setSelectedId(p.id);
+  };
+
   const filters: { key: Filter; label: string }[] = [
     { key: "All", label: "All Personnel" },
     { key: "AVAILABLE", label: "Available" },
@@ -126,9 +133,12 @@ export default function StaffPage() {
             Manage brigade availability, certifications and contact details.
           </p>
         </div>
-        <button onClick={openAdd} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white">
-          + Add Staff Member
-        </button>
+        <div className="flex items-start gap-2">
+          <FileIOButtons path="staff" filename="staff" onImported={() => invalidate()} onError={setError} />
+          <button onClick={openAdd} className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white">
+            + Add Staff Member
+          </button>
+        </div>
       </div>
 
       <ErrorBanner message={error ?? loadError} onDismiss={() => setError(null)} />
@@ -168,7 +178,7 @@ export default function StaffPage() {
 
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase text-gray-500">
-              <tr><th className="py-2">Member</th><th>Staff ID</th><th>Contact</th><th>Employed</th><th>Status</th></tr>
+              <tr><th className="py-2">Member</th><th>Staff ID</th><th>Contact</th><th>Employed</th><th>Status</th><th className="text-right">Actions</th></tr>
             </thead>
             <tbody>
               {visible.map((p) => (
@@ -182,10 +192,21 @@ export default function StaffPage() {
                   <td>{p.contactNumber ?? "—"}</td>
                   <td>{p.employed ? "Yes" : "No"}</td>
                   <td><StatusBadge tone={tones[p.availability]}>{label(p.availability)}</StatusBadge></td>
+                  <td className="text-right">
+                    {p.employed && (
+                      <button
+                        disabled={busy || p.availability === "DISPATCHED"}
+                        title={p.availability === "DISPATCHED" ? "Release them from the incident first" : "Retire this staff member"}
+                        onClick={(e) => { e.stopPropagation(); retire(p); }}
+                        className="rounded border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">
+                        Retire
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
               {visible.length === 0 && (
-                <tr><td colSpan={5} className="py-6 text-center text-gray-500">
+                <tr><td colSpan={6} className="py-6 text-center text-gray-500">
                   {loading ? "Loading..." : "No staff found."}
                 </td></tr>
               )}

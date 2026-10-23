@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import ErrorBanner from "@/components/ErrorBanner";
+import FileIOButtons from "@/components/FileIOButtons";
 import Modal, { inputCls } from "@/components/Modal";
 import dynamic from "next/dynamic";
 import CommandPanel from "@/components/CommandPanel";
@@ -93,7 +94,8 @@ export default function IncidentsPage() {
           <p className="text-xs uppercase text-gray-500">Resolved</p>
           <p className="font-bold">{incidents.length - ongoing.length} Resolved</p>
         </div>
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex items-center gap-2">
+          <FileIOButtons path="incidents" filename="incidents" onImported={() => invalidate()} onError={setError} />
           <CreateEventButton />
           <button onClick={() => setShowReport(true)}
             className="rounded bg-red-700 px-4 py-2 text-sm font-semibold text-white">+ Report Incident</button>
