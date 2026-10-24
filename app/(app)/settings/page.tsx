@@ -112,6 +112,17 @@ function Preferences({ s }: { s: Settings }) {
             options={[{ value: "ALL", label: "All" }, { value: "ONGOING", label: "Ongoing" }, { value: "RESOLVED", label: "Resolved" }]} />
         </Row>
       </Section>
+      <Section title="Notifications" hint="Choose what this screen shows. Everyone receives the same notifications; these switches only control what appears here.">
+        <Row label="Show previews" hint="Pop-ups show the notification text. When off, they only say that something new arrived.">
+          <Toggle label="Show previews" checked={s.showPreviews} onChange={(showPreviews) => updateSettings({ showPreviews })} />
+        </Row>
+        <Row label="Report notifications" hint="Pop-ups and bell entries when a new incident is reported.">
+          <Toggle label="Report notifications" checked={s.notifyReports} onChange={(notifyReports) => updateSettings({ notifyReports })} />
+        </Row>
+        <Row label="Event notifications" hint="Pop-ups and bell entries when a new event is added.">
+          <Toggle label="Event notifications" checked={s.notifyEvents} onChange={(notifyEvents) => updateSettings({ notifyEvents })} />
+        </Row>
+      </Section>
       <Section title="Date and time" hint="Applies to every timestamp, including incident timelines.">
         <Row label="Time format">
           <Choice value={s.timeFormat} onChange={(timeFormat) => updateSettings({ timeFormat })}

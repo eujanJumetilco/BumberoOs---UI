@@ -11,6 +11,7 @@ export type ItemCategory =
 export type ItemCondition = "GOOD" | "DAMAGED" | "RETIRED";
 export type ItemAvailability = "AVAILABLE" | "PARTIALLY_DISPATCHED" | "DISPATCHED" | "UNAVAILABLE";
 export type UserRole = "ADMIN" | "DISPATCHER";
+export type NotificationType = "INCIDENT" | "EVENT";
 
 export const ALARM_LEVELS = [
   "FIRST_ALARM", "SECOND_ALARM", "THIRD_ALARM", "FOURTH_ALARM", "FIFTH_ALARM",
@@ -133,6 +134,16 @@ export type Account = {
   createdAt: string | null;
 };
 
+/** Named AppNotification so it never clashes with the browser's built-in Notification type. */
+export type AppNotification = {
+  id: number;
+  message: string;
+  type: NotificationType;
+  createdAt: string;
+  /** Shared by all accounts: once anyone reads it, it is read for everyone. */
+  read: boolean;
+};
+
 export type NewIncident = {
   nature: IncidentNature;
   alarmLevel?: AlarmLevel;
@@ -219,6 +230,11 @@ export const api = {
   /** Soft-remove: sets employed = false and availability = UNAVAILABLE. History is kept. */
   retireStaff: (id: number) => request<Staff>("PATCH", `/staff/${id}/retire`),
   deleteStaff: (id: number) => request<void>("DELETE", `/staff/${id}`),
+
+  // Notifications (the live feed itself is an EventSource, see NotificationContext)
+  listNotifications: () => request<AppNotification[]>("GET", "/notifications"),
+  markNotificationRead: (id: number) => request<AppNotification>("POST", `/notifications/${id}/read`),
+  markAllNotificationsRead: () => request<{ updated: number }>("POST", "/notifications/read-all"),
 
   // Items
   listItems: (f: { category?: ItemCategory; availableOnly?: boolean } = {}) =>

@@ -21,6 +21,12 @@ export type Settings = {
   landingPage: LandingPage;
   incidentsFilter: IncidentsFilter;
   timeFormat: TimeFormat;
+  /** Pop-ups show the notification text. When off they only say that something new arrived. */
+  showPreviews: boolean;
+  /** Pop-ups and bell entries for newly reported incidents. */
+  notifyReports: boolean;
+  /** Pop-ups and bell entries for newly added events. */
+  notifyEvents: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -31,6 +37,9 @@ export const DEFAULT_SETTINGS: Settings = {
   landingPage: "dashboard",
   incidentsFilter: "ALL",
   timeFormat: "24h",
+  showPreviews: true,
+  notifyReports: true,
+  notifyEvents: true,
 };
 
 /**

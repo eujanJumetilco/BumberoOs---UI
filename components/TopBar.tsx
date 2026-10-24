@@ -1,4 +1,5 @@
 "use client";
+import NotificationBell from "@/components/NotificationBell";
 import { useAccount } from "@/lib/auth";
 import { useResource } from "@/lib/store";
 
@@ -25,6 +26,7 @@ export default function TopBar() {
             : ongoing.length ? `${ongoing.length} Ongoing Incident${ongoing.length > 1 ? "s" : ""}`
             : "Station Status: Ready"}
         </span>
+        <NotificationBell />
       </div>
     </header>
   );

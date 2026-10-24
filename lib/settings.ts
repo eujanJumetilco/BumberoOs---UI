@@ -24,6 +24,9 @@ function parse(raw: string | null): Settings {
     landingPage: oneOf(p.landingPage, ["dashboard", "incidents"], d.landingPage),
     incidentsFilter: oneOf(p.incidentsFilter, ["ALL", "ONGOING", "RESOLVED"], d.incidentsFilter),
     timeFormat: oneOf(p.timeFormat, ["12h", "24h"], d.timeFormat),
+    showPreviews: typeof p.showPreviews === "boolean" ? p.showPreviews : d.showPreviews,
+    notifyReports: typeof p.notifyReports === "boolean" ? p.notifyReports : d.notifyReports,
+    notifyEvents: typeof p.notifyEvents === "boolean" ? p.notifyEvents : d.notifyEvents,
   };
 }
 
