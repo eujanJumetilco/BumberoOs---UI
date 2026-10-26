@@ -7,10 +7,11 @@ import { api, type AppNotification, type NotificationType } from "@/lib/api";
 import { useAccount } from "@/lib/auth";
 import { useSettings, type Settings } from "@/lib/settings";
 
-// The live feed connects straight to the Spring server (CORS and the session cookie are already allowed
-// for http://localhost:3000). Next.js' /api proxy can hold back a never-ending response, so it is bypassed
-// here. Set NEXT_PUBLIC_STREAM_URL (no trailing slash) if the server is not on localhost:8080.
-const STREAM_URL = `${process.env.NEXT_PUBLIC_STREAM_URL ?? "http://localhost:8080"}/api/notifications/stream`;
+// The live feed goes through the same-origin /api proxy, like every other call, so the session cookie is
+// sent even when the UI and the server are on different hosts (Vercel and Railway). The server marks the
+// stream no-transform and sends a keep-alive, so the proxy neither buffers it nor drops it while quiet.
+// NEXT_PUBLIC_STREAM_URL (no trailing slash) can point it at the server directly instead.
+const STREAM_URL = `${process.env.NEXT_PUBLIC_STREAM_URL ?? ""}/api/notifications/stream`;
 
 const MAX_KEPT = 100;
 const MAX_TOASTS = 3;

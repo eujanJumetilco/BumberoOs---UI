@@ -11,8 +11,6 @@ const LocationPicker = dynamic(() => import("./LocationPicker"), {
   loading: () => <p className="mb-4 text-sm text-gray-500">Loading map...</p>,
 });
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
 export type EventItem = {
   id: number;
   title: string;
@@ -42,9 +40,8 @@ export default function EventModal({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/events`, {
+      const res = await fetch("/api/events", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           title: title.trim(),
